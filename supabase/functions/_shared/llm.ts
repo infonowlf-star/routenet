@@ -28,6 +28,8 @@ export interface ChatOptions {
   openRouterTimeoutMs?: number;
   /** Skip the slower retry when a strict latency budget is required. */
   openRouterSingleAttempt?: boolean;
+  /** Maximum time for the Lovable gateway request. */
+  gatewayTimeoutMs?: number;
 }
 
 export interface ChatResult {
@@ -58,6 +60,7 @@ async function callLovable(o: ChatOptions): Promise<string | null> {
   if (!key) return null;
   const r = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
     method: "POST",
+    ...(o.gatewayTimeoutMs ? { signal: AbortSignal.timeout(o.gatewayTimeoutMs) } : {}),
     headers: { "Content-Type": "application/json", "Lovable-API-Key": key },
     body: JSON.stringify({
       model: o.gatewayModel || DEFAULTS.gatewayModel,
@@ -65,6 +68,7 @@ async function callLovable(o: ChatOptions): Promise<string | null> {
         { role: "system", content: o.system },
         { role: "user", content: o.user },
       ],
+      ...(o.temperature != null ? { temperature: o.temperature } : {}),
       ...(o.json === false ? {} : { response_format: { type: "json_object" } }),
     }),
   });
@@ -107,7 +111,12 @@ async function callGemini(o: ChatOptions): Promise<string | null> {
   return text || null;
 }
 
-async function openRouterOnce(o: ChatOptions, model: string, timeoutMs: number): Promise<string | null> {
+async function openRouterOnce(
+  o: ChatOptions,
+  model: string,
+  timeoutMs: number,
+  maxTokensOverride?: number,
+): Promise<string | null> {
   const key = Deno.env.get("OPENROUTER_API_KEY");
   if (!key) return null;
   const r = await fetch("https://openrouter.ai/api/v1/chat/completions", {
@@ -127,7 +136,7 @@ async function openRouterOnce(o: ChatOptions, model: string, timeoutMs: number):
       ],
       // Free / low-credit OpenRouter accounts cap the affordable token budget,
       // so always send an explicit modest max_tokens instead of the model max.
-      max_tokens: Math.min(o.maxOutputTokens ?? 8000, 8000),
+      max_tokens: maxTokensOverride ?? Math.min(o.maxOutputTokens ?? 8000, 8000),
       ...(o.temperature != null ? { temperature: o.temperature } : {}),
       ...(o.json === false ? {} : { response_format: { type: "json_object" } }),
     }),
@@ -144,7 +153,12 @@ async function openRouterOnce(o: ChatOptions, model: string, timeoutMs: number):
  * OpenRouter is the primary provider. It gets a bounded timeout plus one retry
  * on a lighter, faster model so a slow or hiccuping route never stalls the app.
  */
+/** Set when OpenRouter reports no credits; skips it for a while so latency-
+ *  sensitive calls go straight to the working provider. */
+let openRouterCooldownUntil = 0;
+
 async function callOpenRouter(o: ChatOptions): Promise<string | null> {
+  if (Date.now() < openRouterCooldownUntil) return null;
   const configuredModel = Deno.env.get("OPENROUTER_RECOMMENDATION_MODEL");
   const primary = o.openRouterModel || configuredModel || DEFAULTS.openRouterModel;
   const timeout = o.openRouterTimeoutMs ?? 25000;
@@ -160,7 +174,24 @@ async function callOpenRouter(o: ChatOptions): Promise<string | null> {
       if (text.trim()) return text;
     } catch (e) {
       lastErr = e;
-      console.error(`[llm] openrouter ${model} failed: ${e instanceof Error ? e.message : String(e)}`);
+      const msg = e instanceof Error ? e.message : String(e);
+      console.error(`[llm] openrouter ${model} failed: ${msg}`);
+      if (/\b402\b|more credits|insufficient/i.test(msg)) {
+        openRouterCooldownUntil = Date.now() + 10 * 60 * 1000;
+      }
+      // Low-credit accounts reject the request but tell us the affordable
+      // budget — retry immediately within it instead of failing the feature.
+      const afford = msg.match(/can only afford (\d+)/);
+      if (afford) {
+        const budget = Math.max(400, Number(afford[1]) - 50);
+        try {
+          const text = await openRouterOnce(o, model, timeoutMs, budget);
+          if (text && text.trim()) return text;
+        } catch (e2) {
+          lastErr = e2;
+          console.error(`[llm] openrouter ${model} budget retry failed`);
+        }
+      }
     }
   }
   if (lastErr) throw lastErr instanceof Error ? lastErr : new Error(String(lastErr));
