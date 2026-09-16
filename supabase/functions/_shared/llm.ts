@@ -136,7 +136,7 @@ async function openRouterOnce(
       ],
       // Free / low-credit OpenRouter accounts cap the affordable token budget,
       // so always send an explicit modest max_tokens instead of the model max.
-      max_tokens: Math.min(o.maxOutputTokens ?? 8000, 8000),
+      max_tokens: maxTokensOverride ?? Math.min(o.maxOutputTokens ?? 8000, 8000),
       ...(o.temperature != null ? { temperature: o.temperature } : {}),
       ...(o.json === false ? {} : { response_format: { type: "json_object" } }),
     }),
