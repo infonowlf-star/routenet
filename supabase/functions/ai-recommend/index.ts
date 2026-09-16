@@ -116,7 +116,7 @@ Return a JSON object: { "tracks": [{ "title": string, "artist": string, "role": 
 
     // Large lists are split into parallel model calls so a 50-song queue comes
     // back in roughly the time one 25-song call takes.
-    const chunkCount = count > 26 ? 2 : 1;
+    const chunkCount = Math.min(4, Math.max(1, Math.ceil(count / 14)));
     const perChunk = Math.ceil(count / chunkCount);
 
     const askOnce = (n: number, seedNote: string) =>
