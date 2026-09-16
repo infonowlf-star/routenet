@@ -643,7 +643,9 @@ export function GlobalAudioPlayer() {
     const startPlayback = async () => {
       // Try the local blob before resolving any network source. This is what
       // makes a downloaded track playable when the device is offline.
-      if (isDownloadedSync(track.id)) {
+      const hasLocalCopy =
+        isDownloadedSync(track.id) || !navigator.onLine || !!(await getSong(track.id));
+      if (hasLocalCopy) {
         const playedOffline = await tryPlayWithPiped(track.youtubeId || null, track);
         if (requestToken !== searchTokenRef.current) return;
         if (playedOffline) {
