@@ -153,7 +153,12 @@ async function openRouterOnce(
  * OpenRouter is the primary provider. It gets a bounded timeout plus one retry
  * on a lighter, faster model so a slow or hiccuping route never stalls the app.
  */
+/** Set when OpenRouter reports no credits; skips it for a while so latency-
+ *  sensitive calls go straight to the working provider. */
+let openRouterCooldownUntil = 0;
+
 async function callOpenRouter(o: ChatOptions): Promise<string | null> {
+  if (Date.now() < openRouterCooldownUntil) return null;
   const configuredModel = Deno.env.get("OPENROUTER_RECOMMENDATION_MODEL");
   const primary = o.openRouterModel || configuredModel || DEFAULTS.openRouterModel;
   const timeout = o.openRouterTimeoutMs ?? 25000;
