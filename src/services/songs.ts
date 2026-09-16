@@ -132,7 +132,15 @@ export async function resolveStreamUrls(
   });
   if (!res.ok) {
     let msg = `HTTP ${res.status}`;
-    try { msg = (await res.json())?.error || msg; } catch { /* ignore */ }
+    let code = "";
+    try {
+      const body = await res.json();
+      msg = body?.error || msg;
+      code = body?.code || "";
+    } catch { /* ignore */ }
+    // A bot check usually means the cached proof is stale — drop it so the
+    // next attempt mints a fresh one in the browser.
+    if (code === "YOUTUBE_TEMPORARILY_BLOCKED") invalidatePoToken();
     throw new Error(msg);
   }
   const data = await res.json();
