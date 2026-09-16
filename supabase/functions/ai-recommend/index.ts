@@ -135,7 +135,7 @@ Return a JSON object: { "tracks": [{ "title": string, "artist": string, "role": 
         // leaves the queue empty.
         gatewayModel: "google/gemini-3.1-flash-lite",
         gatewayTimeoutMs: 6000,
-        maxOutputTokens: 2200,
+        maxOutputTokens: 1500,
       });
 
     let provider = "openrouter";
