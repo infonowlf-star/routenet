@@ -169,7 +169,21 @@ async function callOpenRouter(o: ChatOptions): Promise<string | null> {
       if (text.trim()) return text;
     } catch (e) {
       lastErr = e;
-      console.error(`[llm] openrouter ${model} failed: ${e instanceof Error ? e.message : String(e)}`);
+      const msg = e instanceof Error ? e.message : String(e);
+      console.error(`[llm] openrouter ${model} failed: ${msg}`);
+      // Low-credit accounts reject the request but tell us the affordable
+      // budget — retry immediately within it instead of failing the feature.
+      const afford = msg.match(/can only afford (\d+)/);
+      if (afford) {
+        const budget = Math.max(400, Number(afford[1]) - 50);
+        try {
+          const text = await openRouterOnce(o, model, timeoutMs, budget);
+          if (text && text.trim()) return text;
+        } catch (e2) {
+          lastErr = e2;
+          console.error(`[llm] openrouter ${model} budget retry failed`);
+        }
+      }
     }
   }
   if (lastErr) throw lastErr instanceof Error ? lastErr : new Error(String(lastErr));
