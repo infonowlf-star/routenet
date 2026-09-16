@@ -165,12 +165,13 @@ async function mint(videoId: string): Promise<PoTokenBundle | null> {
   if (!integrityTokenData.integrityToken) throw new Error("no integrity token returned");
 
   const minter = await WebPoMinter.create(integrityTokenData, webPoSignalOutput as any);
-  // Current WebPO tokens are content-bound to the requested video. The same
-  // binding is required by both the player request and the `pot` parameter on
-  // the resulting Google Video URL. A visitor-bound media token is treated as
-  // invalid and eventually produces LOGIN_REQUIRED / bot-check responses.
+  // Two different bindings are required:
+  //  - the player ("session") token binds to visitorData
+  //  - the media ("content") token on the Google Video URL binds to the video id
+  // Minting both against the video id makes YouTube reject the player request
+  // with LOGIN_REQUIRED / "confirm you're not a bot".
   const [poToken, gvsPoToken] = await Promise.all([
-    minter.mintAsWebsafeString(videoId),
+    minter.mintAsWebsafeString(visitorData),
     minter.mintAsWebsafeString(videoId),
   ]);
   if (!poToken || !gvsPoToken) throw new Error("PO token minting returned nothing");
