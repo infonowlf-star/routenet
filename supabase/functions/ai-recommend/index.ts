@@ -128,11 +128,14 @@ Return a JSON object: { "tracks": [{ "title": string, "artist": string, "role": 
         // Keep recommendations on the fast OpenRouter path only. This avoids
         // provider hops and keeps the queue response inside the UI latency budget.
         prefer: "openrouter",
-        openRouterOnly: true,
         openRouterSingleAttempt: true,
         openRouterModel: "google/gemini-2.5-flash-lite",
-        openRouterTimeoutMs: 4500,
-        maxOutputTokens: 2600,
+        openRouterTimeoutMs: 3500,
+        // Fast built-in fallback so a low-credit or slow OpenRouter route never
+        // leaves the queue empty.
+        gatewayModel: "google/gemini-3.1-flash-lite",
+        gatewayTimeoutMs: 6000,
+        maxOutputTokens: 2200,
       });
 
     let provider = "openrouter";
