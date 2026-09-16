@@ -60,6 +60,7 @@ async function callLovable(o: ChatOptions): Promise<string | null> {
   if (!key) return null;
   const r = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
     method: "POST",
+    ...(o.gatewayTimeoutMs ? { signal: AbortSignal.timeout(o.gatewayTimeoutMs) } : {}),
     headers: { "Content-Type": "application/json", "Lovable-API-Key": key },
     body: JSON.stringify({
       model: o.gatewayModel || DEFAULTS.gatewayModel,
@@ -67,6 +68,7 @@ async function callLovable(o: ChatOptions): Promise<string | null> {
         { role: "system", content: o.system },
         { role: "user", content: o.user },
       ],
+      ...(o.temperature != null ? { temperature: o.temperature } : {}),
       ...(o.json === false ? {} : { response_format: { type: "json_object" } }),
     }),
   });
