@@ -125,9 +125,13 @@ Return a JSON object: { "tracks": [{ "title": string, "artist": string, "role": 
         user: `${user}\n\n${seedNote}\nReturn exactly ${n} items.`,
         json: true,
         temperature: 0.9,
-        // OpenRouter first with the fastest capable model; others are fallbacks.
+        // Keep recommendations on the fast OpenRouter path only. This avoids
+        // provider hops and keeps the queue response inside the UI latency budget.
         prefer: "openrouter",
+        openRouterOnly: true,
+        openRouterSingleAttempt: true,
         openRouterModel: "google/gemini-2.5-flash-lite",
+        openRouterTimeoutMs: 4500,
         maxOutputTokens: 2600,
       });
 

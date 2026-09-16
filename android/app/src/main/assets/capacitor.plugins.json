@@ -1,5 +1,9 @@
 [
 	{
+		"pkg": "@capacitor/filesystem",
+		"classpath": "com.capacitorjs.plugins.filesystem.FilesystemPlugin"
+	},
+	{
 		"pkg": "@capgo/native-audio",
 		"classpath": "ee.forgr.audio.NativeAudio"
 	}

@@ -336,7 +336,7 @@ export function GlobalAudioPlayer() {
   }, [stopPrevAudio]);
 
   // Offline-first: a downloaded blob, otherwise Piped audio
-  const tryPlayWithPiped = useCallback(async (videoId: string, track: Track) => {
+  const tryPlayWithPiped = useCallback(async (videoId: string | null, track: Track) => {
     let result: { url: string } | null = null;
 
     // Downloaded tracks always play from local storage — works fully offline.
@@ -345,13 +345,19 @@ export function GlobalAudioPlayer() {
         const saved = await getSong(track.id);
         if (saved?.blob) {
           if (localBlobUrlRef.current) URL.revokeObjectURL(localBlobUrlRef.current);
-          localBlobUrlRef.current = URL.createObjectURL(saved.blob);
-          result = { url: localBlobUrlRef.current };
+          if (saved.localUri) {
+            result = { url: saved.localUri };
+          } else {
+            localBlobUrlRef.current = URL.createObjectURL(saved.blob);
+            result = { url: localBlobUrlRef.current };
+          }
         }
       }
     } catch { /* fall through to network */ }
 
-    if (!result && shouldUseIframe(videoId)) return false;
+    if (!result) {
+      if (!videoId || shouldUseIframe(videoId)) return false;
+    }
 
     try {
       if (!result) result = await getPipedAudioUrl(videoId, 6000);
@@ -629,13 +635,27 @@ export function GlobalAudioPlayer() {
       setShowPlayer(true);
     };
 
-    if (track.youtubeId) {
-      cacheYouTubeId(track.title, track.artist, track.youtubeId);
-      stopPipedAudio();
-      setIsSearching(false);
-      resolveAndPlay(track.youtubeId);
-      return;
-    }
+    const startPlayback = async () => {
+      // Try the local blob before resolving any network source. This is what
+      // makes a downloaded track playable when the device is offline.
+      if (isDownloadedSync(track.id)) {
+        const playedOffline = await tryPlayWithPiped(track.youtubeId || null, track);
+        if (requestToken !== searchTokenRef.current) return;
+        if (playedOffline) {
+          setIsSearching(false);
+          setYoutubeId(null);
+          setShowPlayer(false);
+          return;
+        }
+      }
+
+      if (track.youtubeId) {
+        cacheYouTubeId(track.title, track.artist, track.youtubeId);
+        stopPipedAudio();
+        setIsSearching(false);
+        resolveAndPlay(track.youtubeId);
+        return;
+      }
 
     const memCached = getCachedYouTubeId(track.title, track.artist);
     if (memCached) {
@@ -645,59 +665,62 @@ export function GlobalAudioPlayer() {
       return;
     }
 
-    setIsSearching(true);
-    stopPipedAudio();
+      setIsSearching(true);
+      stopPipedAudio();
 
-    searchTimeoutRef.current = setTimeout(() => {
-      if (requestToken === searchTokenRef.current) {
-        toast({ title: "Skipping song", description: `"${track.title}" took too long to load`, variant: "destructive" });
-        setIsSearching(false);
-        next();
-      }
-    }, 15000);
-
-    const trySearch = async (attempt: number): Promise<string | null> => {
-      try {
-        const id = await searchYouTubeForTrack(track);
-        if (id) return id;
-        if (attempt < 2) {
-          await new Promise(r => setTimeout(r, 1500));
-          return trySearch(attempt + 1);
-        }
-        return null;
-      } catch (e) {
-        if (attempt < 2) {
-          await new Promise(r => setTimeout(r, 1500));
-          return trySearch(attempt + 1);
-        }
-        throw e;
-      }
-    };
-
-    trySearch(1)
-      .then(async (id) => {
-        if (requestToken !== searchTokenRef.current) return;
-        if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
-
-        if (id) {
-          cacheYouTubeId(track.title, track.artist, id);
-          track.youtubeId = id;
-          await resolveAndPlay(id);
-        } else {
-          toast({ title: "Song unavailable", description: `Couldn't find "${track.title}" — skipping`, variant: "destructive" });
+      searchTimeoutRef.current = setTimeout(() => {
+        if (requestToken === searchTokenRef.current) {
+          toast({ title: "Skipping song", description: `"${track.title}" took too long to load`, variant: "destructive" });
+          setIsSearching(false);
           next();
         }
-      })
-      .catch((e) => {
-        if (requestToken !== searchTokenRef.current) return;
-        if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
-        console.error("[GlobalAudioPlayer] YouTube search error:", e);
-        toast({ title: "Playback error", description: `Skipping "${track.title}"`, variant: "destructive" });
-        next();
-      })
-      .finally(() => {
-        if (requestToken === searchTokenRef.current) setIsSearching(false);
-      });
+      }, 15000);
+
+      const trySearch = async (attempt: number): Promise<string | null> => {
+        try {
+          const id = await searchYouTubeForTrack(track);
+          if (id) return id;
+          if (attempt < 2) {
+            await new Promise(r => setTimeout(r, 1500));
+            return trySearch(attempt + 1);
+          }
+          return null;
+        } catch (e) {
+          if (attempt < 2) {
+            await new Promise(r => setTimeout(r, 1500));
+            return trySearch(attempt + 1);
+          }
+          throw e;
+        }
+      };
+
+      trySearch(1)
+        .then(async (id) => {
+          if (requestToken !== searchTokenRef.current) return;
+          if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
+
+          if (id) {
+            cacheYouTubeId(track.title, track.artist, id);
+            track.youtubeId = id;
+            await resolveAndPlay(id);
+          } else {
+            toast({ title: "Song unavailable", description: `Couldn't find "${track.title}" — skipping`, variant: "destructive" });
+            next();
+          }
+        })
+        .catch((e) => {
+          if (requestToken !== searchTokenRef.current) return;
+          if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
+          console.error("[GlobalAudioPlayer] YouTube search error:", e);
+          toast({ title: "Playback error", description: `Skipping "${track.title}"`, variant: "destructive" });
+          next();
+        })
+        .finally(() => {
+          if (requestToken === searchTokenRef.current) setIsSearching(false);
+        });
+    };
+
+    void startPlayback();
 
     return () => {
       if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);

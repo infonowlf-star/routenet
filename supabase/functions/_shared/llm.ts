@@ -1,8 +1,6 @@
 /**
- * Shared LLM helper with a 3-provider fallback chain:
- *   1. Lovable AI Gateway   (LOVABLE_API_KEY)
- *   2. Google Gemini direct (GEMINI_API_KEY)
- *   3. OpenRouter           (OPENROUTER_API_KEY)
+ * Shared LLM helper with OpenRouter as the primary provider and optional
+ * legacy fallbacks for non-recommendation features.
  *
  * Every provider is tried in order until one returns text. This keeps the
  * app's AI engine (recommendations, playlists, DJ, sections) working even when
@@ -24,6 +22,12 @@ export interface ChatOptions {
   openRouterModel?: string;
   /** Provider tried first; the others stay as fallbacks. */
   prefer?: "lovable" | "gemini" | "openrouter";
+  /** Disable legacy providers for latency-sensitive features. */
+  openRouterOnly?: boolean;
+  /** Maximum time for each OpenRouter request. */
+  openRouterTimeoutMs?: number;
+  /** Skip the slower retry when a strict latency budget is required. */
+  openRouterSingleAttempt?: boolean;
 }
 
 export interface ChatResult {
@@ -141,11 +145,13 @@ async function openRouterOnce(o: ChatOptions, model: string, timeoutMs: number):
  * on a lighter, faster model so a slow or hiccuping route never stalls the app.
  */
 async function callOpenRouter(o: ChatOptions): Promise<string | null> {
-  const primary = o.openRouterModel || DEFAULTS.openRouterModel;
-  const attempts: Array<[string, number]> = [
-    [primary, 25000],
-    [DEFAULTS.openRouterFastModel, 20000],
-  ];
+  const configuredModel = Deno.env.get("OPENROUTER_RECOMMENDATION_MODEL");
+  const primary = o.openRouterModel || configuredModel || DEFAULTS.openRouterModel;
+  const timeout = o.openRouterTimeoutMs ?? 25000;
+  const retryTimeout = o.openRouterTimeoutMs ?? 20000;
+  const attempts: Array<[string, number]> = o.openRouterSingleAttempt
+    ? [[primary, timeout]]
+    : [[primary, timeout], [DEFAULTS.openRouterFastModel, retryTimeout]];
   let lastErr: unknown = null;
   for (const [model, timeoutMs] of attempts) {
     try {
@@ -177,6 +183,9 @@ export async function chatComplete(o: ChatOptions): Promise<ChatResult> {
       ...providers.filter(([n]) => n === o.prefer),
       ...providers.filter(([n]) => n !== o.prefer),
     ];
+  }
+  if (o.openRouterOnly) {
+    providers = providers.filter(([name]) => name === "openrouter");
   }
 
   const errors: string[] = [];

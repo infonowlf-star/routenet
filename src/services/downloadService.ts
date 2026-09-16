@@ -12,6 +12,7 @@ import { getCachedYouTubeId } from "@/components/player/GlobalAudioPlayer";
 import { Track } from "@/data/mockData";
 import { saveSong, isSongDownloaded, getStorageUsage, type OfflineSong } from "./indexedDBService";
 import { getPoToken, invalidatePoToken } from "./poTokenProvider";
+import { saveAudioToPhone } from "./localAudioFileService";
 import {
   fetchMediaBlob, fetchDirectBlob, resolveStreamUrls, saveBlobToDevice,
   safeFileName, extensionForType,
@@ -136,6 +137,7 @@ export async function downloadTrack(
     if (!videoId) throw new Error("could not find this song's audio source");
 
     const { blob } = await grabAudio(track, videoId, onProgress, onDetail);
+    const localUri = await saveAudioToPhone(track.id, blob);
 
     const offlineSong: OfflineSong = {
       id: track.id,
@@ -148,6 +150,7 @@ export async function downloadTrack(
       downloadedAt: Date.now(),
       size: blob.size,
       youtubeId: videoId,
+      localUri,
       ...(groupInfo || {}),
     };
 
@@ -194,6 +197,7 @@ export async function saveTrackToDevice(
     if (!videoId) throw new Error("could not find this song's audio source");
 
     const { blob, type } = await grabAudio(track, videoId, onProgress, onDetail);
+    const localUri = await saveAudioToPhone(track.id, blob);
 
     saveBlobToDevice(blob, safeFileName(`${track.artist} - ${track.title}`, extensionForType(type)));
 
@@ -209,6 +213,7 @@ export async function saveTrackToDevice(
         downloadedAt: Date.now(),
         size: blob.size,
         youtubeId: videoId,
+        localUri,
       } as OfflineSong);
     } catch { /* offline cache is best-effort */ }
 

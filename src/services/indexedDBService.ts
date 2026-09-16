@@ -18,6 +18,7 @@ export interface OfflineSong {
   downloadedAt: number;
   size: number;
   youtubeId?: string;
+  localUri?: string;
   /** Album or playlist grouping key */
   groupKey?: string;
   groupType?: "album" | "playlist";
@@ -118,6 +119,8 @@ export async function deleteSong(id: string): Promise<void> {
     tx.oncomplete = () => resolve();
     tx.onerror = () => reject(tx.error);
   });
+  const { deleteAudioFromPhone } = await import("./localAudioFileService");
+  await deleteAudioFromPhone(id);
   writeIndex(readIndex().filter((x) => x !== id));
 }
 
