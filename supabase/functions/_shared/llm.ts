@@ -176,6 +176,9 @@ async function callOpenRouter(o: ChatOptions): Promise<string | null> {
       lastErr = e;
       const msg = e instanceof Error ? e.message : String(e);
       console.error(`[llm] openrouter ${model} failed: ${msg}`);
+      if (/\b402\b|more credits|insufficient/i.test(msg)) {
+        openRouterCooldownUntil = Date.now() + 10 * 60 * 1000;
+      }
       // Low-credit accounts reject the request but tell us the affordable
       // budget — retry immediately within it instead of failing the feature.
       const afford = msg.match(/can only afford (\d+)/);
