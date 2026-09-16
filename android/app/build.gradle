@@ -1,0 +1,80 @@
+plugins {
+    id("com.android.application")
+    id("org.jetbrains.kotlin.android")
+}
+
+android {
+    namespace = "com.ericbuvfh.tunestream"
+    compileSdk = 35
+
+    defaultConfig {
+        applicationId = "com.ericbuvfh.tunestream"
+        minSdk = 24
+        targetSdk = 35
+        versionCode = 1
+        versionName = providers.gradleProperty("versionName").orElse("1.0.0").get()
+    }
+
+    signingConfigs {
+        create("release") {
+            def keystorePath = providers.gradleProperty("android.injected.signing.store.file").orNull
+            if (keystorePath != null) {
+                storeFile = file(keystorePath)
+                storePassword = providers.gradleProperty("android.injected.signing.store.password").orNull
+                keyAlias = providers.gradleProperty("android.injected.signing.key.alias").orNull
+                keyPassword = providers.gradleProperty("android.injected.signing.key.password").orNull
+            }
+        }
+    }
+
+    buildTypes {
+        release {
+            if (providers.gradleProperty("android.injected.signing.store.file").isPresent()) {
+                signingConfig = signingConfigs.getByName("release")
+            }
+            minifyEnabled = false
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_21
+        targetCompatibility = JavaVersion.VERSION_21
+    }
+
+    kotlinOptions {
+        jvmTarget = "21"
+    }
+
+    buildFeatures {
+        viewBinding = true
+    }
+}
+
+tasks.register("copyWebApp", Copy) {
+    from("../../dist")
+    into("src/main/assets/public")
+}
+
+tasks.named("preBuild") {
+    dependsOn("copyWebApp")
+}
+
+apply from: "capacitor.build.gradle"
+
+dependencies {
+    implementation("androidx.core:core-ktx:1.12.0")
+    implementation("androidx.appcompat:appcompat:1.7.0")
+    implementation("androidx.activity:activity-ktx:1.8.0")
+    implementation("androidx.lifecycle:lifecycle-service:2.7.0")
+    implementation("androidx.media:media:1.7.0")
+    implementation("androidx.media3:media3-exoplayer:1.5.1")
+    implementation("androidx.media3:media3-ui:1.5.1")
+    implementation("androidx.media3:media3-session:1.5.1")
+    implementation("androidx.media3:media3-common:1.5.1")
+    implementation("androidx.work:work-runtime-ktx:2.8.0")
+    implementation("androidx.webkit:webkit:1.0.0")
+    implementation("com.google.android.material:material:1.11.0")
+    implementation("com.github.bumptech.glide:glide:4.16.0")
+    annotationProcessor("com.github.bumptech.glide:compiler:4.16.0")
+}
