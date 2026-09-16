@@ -340,17 +340,20 @@ export function GlobalAudioPlayer() {
     let result: { url: string } | null = null;
 
     // Downloaded tracks always play from local storage — works fully offline.
+    // Query IndexedDB directly rather than trusting the in-memory index, which
+    // may not be populated yet on a cold start (exactly the offline case).
     try {
-      if (isDownloadedSync(track.id)) {
-        const saved = await getSong(track.id);
-        if (saved?.blob) {
-          if (localBlobUrlRef.current) URL.revokeObjectURL(localBlobUrlRef.current);
-          if (saved.localUri) {
-            result = { url: saved.localUri };
-          } else {
-            localBlobUrlRef.current = URL.createObjectURL(saved.blob);
-            result = { url: localBlobUrlRef.current };
-          }
+      const saved = await getSong(track.id);
+      if (saved?.blob || saved?.localUri) {
+        if (localBlobUrlRef.current) {
+          URL.revokeObjectURL(localBlobUrlRef.current);
+          localBlobUrlRef.current = null;
+        }
+        if (saved.localUri) {
+          result = { url: saved.localUri };
+        } else {
+          localBlobUrlRef.current = URL.createObjectURL(saved.blob as Blob);
+          result = { url: localBlobUrlRef.current };
         }
       }
     } catch { /* fall through to network */ }
@@ -398,8 +401,10 @@ export function GlobalAudioPlayer() {
 
       stopPipedAudio();
 
+      const isLocalSource = result.url.startsWith("blob:") || result.url.startsWith("file:");
       const audio = new Audio(result.url);
-      audio.crossOrigin = "anonymous";
+      // CORS mode must not be set for local blob/file sources.
+      if (!isLocalSource) audio.crossOrigin = "anonymous";
       // Background-playback hardening: make sure the element is treated as
       // a real media player, preloads aggressively, and survives tab hide.
       audio.preload = "auto";
@@ -638,7 +643,9 @@ export function GlobalAudioPlayer() {
     const startPlayback = async () => {
       // Try the local blob before resolving any network source. This is what
       // makes a downloaded track playable when the device is offline.
-      if (isDownloadedSync(track.id)) {
+      const hasLocalCopy =
+        isDownloadedSync(track.id) || !navigator.onLine || !!(await getSong(track.id));
+      if (hasLocalCopy) {
         const playedOffline = await tryPlayWithPiped(track.youtubeId || null, track);
         if (requestToken !== searchTokenRef.current) return;
         if (playedOffline) {
