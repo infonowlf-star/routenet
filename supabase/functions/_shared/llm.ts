@@ -28,6 +28,8 @@ export interface ChatOptions {
   openRouterTimeoutMs?: number;
   /** Skip the slower retry when a strict latency budget is required. */
   openRouterSingleAttempt?: boolean;
+  /** Maximum time for the Lovable gateway request. */
+  gatewayTimeoutMs?: number;
 }
 
 export interface ChatResult {
