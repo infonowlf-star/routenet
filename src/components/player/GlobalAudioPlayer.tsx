@@ -401,8 +401,10 @@ export function GlobalAudioPlayer() {
 
       stopPipedAudio();
 
+      const isLocalSource = result.url.startsWith("blob:") || result.url.startsWith("file:");
       const audio = new Audio(result.url);
-      audio.crossOrigin = "anonymous";
+      // CORS mode must not be set for local blob/file sources.
+      if (!isLocalSource) audio.crossOrigin = "anonymous";
       // Background-playback hardening: make sure the element is treated as
       // a real media player, preloads aggressively, and survives tab hide.
       audio.preload = "auto";
