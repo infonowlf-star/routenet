@@ -291,8 +291,8 @@ async function innertubeResolve(
           ...(sts
             ? { playbackContext: { contentPlaybackContext: { signatureTimestamp: sts, html5Preference: "HTML5_PREF_WANTS" } } }
             : {}),
-          ...(poToken
-            ? { serviceIntegrityDimensions: { poToken } }
+          ...(clientPoToken
+            ? { serviceIntegrityDimensions: { poToken: clientPoToken } }
             : {}),
         }),
         signal: AbortSignal.timeout(12000),
@@ -305,7 +305,7 @@ async function innertubeResolve(
       const adaptive = Array.isArray(data?.streamingData?.adaptiveFormats) ? data.streamingData.adaptiveFormats : [];
       const regular = Array.isArray(data?.streamingData?.formats) ? data.streamingData.formats : [];
       console.log(
-        `[ytresolve] innertube ${client.name} po=${!!poToken} status=${data?.playabilityStatus?.status} formats=${adaptive.length + regular.length} reason=${data?.playabilityStatus?.reason ?? ""}`,
+        `[ytresolve] innertube ${client.name} po=${!!clientPoToken} status=${data?.playabilityStatus?.status} formats=${adaptive.length + regular.length} reason=${data?.playabilityStatus?.reason ?? ""}`,
       );
       if (!adaptive.length && !regular.length) continue;
 
@@ -321,7 +321,7 @@ async function innertubeResolve(
         }))
         .filter((f: any) => !!f.url)
         .map((f: any) => {
-          if (!opts.gvsPoToken) return f;
+          if (!opts.gvsPoToken || !webClient) return f;
           try {
             const mediaUrl = new URL(f.url);
             mediaUrl.searchParams.set("pot", opts.gvsPoToken);
@@ -336,7 +336,7 @@ async function innertubeResolve(
         return {
           url: candidates[0].url,
           mimeType: candidates[0].mimeType,
-          source: `innertube:${client.name}${poToken ? "+po" : ""}`,
+          source: `innertube:${client.name}${clientPoToken ? "+po" : ""}`,
           alternatives: candidates.slice(0, 5),
         };
       }
