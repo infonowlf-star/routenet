@@ -237,18 +237,33 @@ async function innertubeResolve(
   audio: boolean,
   opts: ResolveOptions = {},
 ): Promise<ResolvedStream | null> {
-  const visitorData = opts.visitorData || (await getVisitorData());
+  const serverVisitorData = await getVisitorData();
   const poToken = opts.poToken;
   const cookie = ytCookie();
   const sts = await getSignatureTimestamp();
 
-  // WebPO tokens are generated for the WEB client. Try compatible clients
-  // first when one is supplied; mobile app clients use different attestation.
+  // WebPO tokens (and the visitorData they were minted with) are only valid for
+  // the web client family. Attaching them to the mobile app clients makes
+  // YouTube reject an otherwise-working request with a bot check, so they are
+  // sent to web clients only.
+  const WEBPO_CLIENTS = new Set([
+    "WEB",
+    "MWEB",
+    "TVHTML5",
+    "WEB_EMBEDDED_PLAYER",
+    "TVHTML5_SIMPLY_EMBEDDED_PLAYER",
+  ]);
+
   const clients = poToken
     ? [...INNERTUBE_CLIENTS].sort((a, b) => Number(b.name === "WEB") - Number(a.name === "WEB"))
     : INNERTUBE_CLIENTS;
 
   for (const client of clients) {
+    const webClient = WEBPO_CLIENTS.has(client.name);
+    const clientPoToken = webClient ? poToken : undefined;
+    const visitorData = webClient
+      ? opts.visitorData || serverVisitorData
+      : serverVisitorData;
     try {
       const res = await fetch(INNERTUBE_ENDPOINT, {
         method: "POST",
@@ -276,8 +291,8 @@ async function innertubeResolve(
           ...(sts
             ? { playbackContext: { contentPlaybackContext: { signatureTimestamp: sts, html5Preference: "HTML5_PREF_WANTS" } } }
             : {}),
-          ...(poToken
-            ? { serviceIntegrityDimensions: { poToken } }
+          ...(clientPoToken
+            ? { serviceIntegrityDimensions: { poToken: clientPoToken } }
             : {}),
         }),
         signal: AbortSignal.timeout(12000),
@@ -290,7 +305,7 @@ async function innertubeResolve(
       const adaptive = Array.isArray(data?.streamingData?.adaptiveFormats) ? data.streamingData.adaptiveFormats : [];
       const regular = Array.isArray(data?.streamingData?.formats) ? data.streamingData.formats : [];
       console.log(
-        `[ytresolve] innertube ${client.name} po=${!!poToken} status=${data?.playabilityStatus?.status} formats=${adaptive.length + regular.length} reason=${data?.playabilityStatus?.reason ?? ""}`,
+        `[ytresolve] innertube ${client.name} po=${!!clientPoToken} status=${data?.playabilityStatus?.status} formats=${adaptive.length + regular.length} reason=${data?.playabilityStatus?.reason ?? ""}`,
       );
       if (!adaptive.length && !regular.length) continue;
 
@@ -306,7 +321,7 @@ async function innertubeResolve(
         }))
         .filter((f: any) => !!f.url)
         .map((f: any) => {
-          if (!opts.gvsPoToken) return f;
+          if (!opts.gvsPoToken || !webClient) return f;
           try {
             const mediaUrl = new URL(f.url);
             mediaUrl.searchParams.set("pot", opts.gvsPoToken);
@@ -321,7 +336,7 @@ async function innertubeResolve(
         return {
           url: candidates[0].url,
           mimeType: candidates[0].mimeType,
-          source: `innertube:${client.name}${poToken ? "+po" : ""}`,
+          source: `innertube:${client.name}${clientPoToken ? "+po" : ""}`,
           alternatives: candidates.slice(0, 5),
         };
       }
