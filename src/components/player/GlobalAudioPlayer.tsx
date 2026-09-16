@@ -340,17 +340,20 @@ export function GlobalAudioPlayer() {
     let result: { url: string } | null = null;
 
     // Downloaded tracks always play from local storage — works fully offline.
+    // Query IndexedDB directly rather than trusting the in-memory index, which
+    // may not be populated yet on a cold start (exactly the offline case).
     try {
-      if (isDownloadedSync(track.id)) {
-        const saved = await getSong(track.id);
-        if (saved?.blob) {
-          if (localBlobUrlRef.current) URL.revokeObjectURL(localBlobUrlRef.current);
-          if (saved.localUri) {
-            result = { url: saved.localUri };
-          } else {
-            localBlobUrlRef.current = URL.createObjectURL(saved.blob);
-            result = { url: localBlobUrlRef.current };
-          }
+      const saved = await getSong(track.id);
+      if (saved?.blob || saved?.localUri) {
+        if (localBlobUrlRef.current) {
+          URL.revokeObjectURL(localBlobUrlRef.current);
+          localBlobUrlRef.current = null;
+        }
+        if (saved.localUri) {
+          result = { url: saved.localUri };
+        } else {
+          localBlobUrlRef.current = URL.createObjectURL(saved.blob as Blob);
+          result = { url: localBlobUrlRef.current };
         }
       }
     } catch { /* fall through to network */ }
