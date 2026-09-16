@@ -111,7 +111,12 @@ async function callGemini(o: ChatOptions): Promise<string | null> {
   return text || null;
 }
 
-async function openRouterOnce(o: ChatOptions, model: string, timeoutMs: number): Promise<string | null> {
+async function openRouterOnce(
+  o: ChatOptions,
+  model: string,
+  timeoutMs: number,
+  maxTokensOverride?: number,
+): Promise<string | null> {
   const key = Deno.env.get("OPENROUTER_API_KEY");
   if (!key) return null;
   const r = await fetch("https://openrouter.ai/api/v1/chat/completions", {
