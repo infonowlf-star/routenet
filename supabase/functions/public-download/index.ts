@@ -51,10 +51,10 @@ function assertAllowedTarget(target: string) {
   return parsed;
 }
 
-function json(body: unknown, status = 200) {
+function json(body: unknown, status = 200, extraHeaders: Record<string, string> = {}) {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
+    headers: { ...corsHeaders, "Content-Type": "application/json", ...extraHeaders },
   });
 }
 
@@ -67,9 +67,11 @@ function expectedUpstreamError(error: unknown) {
       code: blocked ? "YOUTUBE_TEMPORARILY_BLOCKED" : "MEDIA_UNAVAILABLE",
       retryable: blocked,
     },
-    // An upstream media miss is an expected, recoverable result. Returning a
-    // 5xx makes the preview treat it as an Edge Function runtime crash.
-    422,
+    // An upstream media miss is expected and handled by the app. Keep the
+    // function invocation successful so preview error handling cannot replace
+    // the player with a blank runtime-error screen.
+    200,
+    { "X-RouteNet-Media-Error": "1", "Cache-Control": "no-store" },
   );
 }
 
@@ -94,7 +96,16 @@ async function proxyMedia(request: Request, target: string, name: string, truste
   });
 
   if (!upstream.ok && upstream.status !== 206) {
-    return new Response(`upstream ${upstream.status}`, { status: 502, headers: corsHeaders });
+    return json(
+      {
+        ok: false,
+        error: `Media source returned HTTP ${upstream.status}`,
+        code: "MEDIA_UNAVAILABLE",
+        retryable: upstream.status === 403 || upstream.status === 429 || upstream.status >= 500,
+      },
+      200,
+      { "X-RouteNet-Media-Error": "1", "Cache-Control": "no-store" },
+    );
   }
 
   const headers = new Headers(corsHeaders);

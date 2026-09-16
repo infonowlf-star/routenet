@@ -236,6 +236,19 @@ export async function fetchMediaBlob(
 
   });
 
+  // Expected upstream YouTube failures are returned with HTTP 200 so the
+  // preview does not classify them as Edge Function runtime crashes. Detect
+  // the explicit marker before reading the response as audio bytes.
+  if (res.headers.get("x-routenet-media-error") === "1") {
+    let message = "media is temporarily unavailable";
+    try {
+      const body = await res.json();
+      if (typeof body?.error === "string" && body.error) message = body.error;
+      if (body?.code === "YOUTUBE_TEMPORARILY_BLOCKED") invalidatePoToken();
+    } catch { /* keep the safe fallback message */ }
+    throw new Error(message);
+  }
+
   if (!res.ok) {
     let msg = `HTTP ${res.status}`;
     try {
