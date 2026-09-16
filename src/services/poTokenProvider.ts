@@ -16,7 +16,7 @@ import { buildURL, getHeaders } from "bgutils-js/utils";
 import { SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY } from "@/integrations/supabase/config";
 
 const REQUEST_KEY = "O43z0dpjhgX20SCx4KAo";
-const CACHE_KEY = "routenet_po_token_v4";
+const CACHE_KEY = "routenet_po_token_v5";
 const DEFAULT_TTL_MS = 6 * 60 * 60 * 1000; // 6h — YouTube's estimate is ~12h
 const ENDPOINT = `${SUPABASE_URL}/functions/v1/public-download`;
 
