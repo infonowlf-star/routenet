@@ -237,18 +237,33 @@ async function innertubeResolve(
   audio: boolean,
   opts: ResolveOptions = {},
 ): Promise<ResolvedStream | null> {
-  const visitorData = opts.visitorData || (await getVisitorData());
+  const serverVisitorData = await getVisitorData();
   const poToken = opts.poToken;
   const cookie = ytCookie();
   const sts = await getSignatureTimestamp();
 
-  // WebPO tokens are generated for the WEB client. Try compatible clients
-  // first when one is supplied; mobile app clients use different attestation.
+  // WebPO tokens (and the visitorData they were minted with) are only valid for
+  // the web client family. Attaching them to the mobile app clients makes
+  // YouTube reject an otherwise-working request with a bot check, so they are
+  // sent to web clients only.
+  const WEBPO_CLIENTS = new Set([
+    "WEB",
+    "MWEB",
+    "TVHTML5",
+    "WEB_EMBEDDED_PLAYER",
+    "TVHTML5_SIMPLY_EMBEDDED_PLAYER",
+  ]);
+
   const clients = poToken
     ? [...INNERTUBE_CLIENTS].sort((a, b) => Number(b.name === "WEB") - Number(a.name === "WEB"))
     : INNERTUBE_CLIENTS;
 
   for (const client of clients) {
+    const webClient = WEBPO_CLIENTS.has(client.name);
+    const clientPoToken = webClient ? poToken : undefined;
+    const visitorData = webClient
+      ? opts.visitorData || serverVisitorData
+      : serverVisitorData;
     try {
       const res = await fetch(INNERTUBE_ENDPOINT, {
         method: "POST",
