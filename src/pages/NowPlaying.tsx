@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowDownCircle, ChevronDown, Heart, Loader2, ListMusic, Mic2, MoreHorizontal, Pause, Play, Plus, Repeat, Repeat1, Share2, Shuffle, SkipBack, SkipForward } from "lucide-react";
+import { ArrowDownCircle, ChevronDown, Heart, Loader2, ListMusic, MessageSquareQuote, MoreHorizontal, Pause, Play, Plus, Repeat, Repeat1, Share2, Shuffle, SkipBack, SkipForward, Volume1, Volume2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { AddToPlaylistDialog } from "@/components/AddToPlaylistDialog";
 import { ShareSheet } from "@/components/ShareSheet";
-import { getCachedYouTubeId, seekGlobalAudio } from "@/components/player/GlobalAudioPlayer";
+import { getCachedYouTubeId, getGlobalVolume, seekGlobalAudio, setGlobalVolume } from "@/components/player/GlobalAudioPlayer";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { usePlayer } from "@/context/PlayerContext";
@@ -39,6 +39,7 @@ export default function NowPlaying() {
   const [downloadStatus, setDownloadStatus] = useState<"idle" | "downloading" | "done" | "failed">("idle");
   const [downloadPercent, setDownloadPercent] = useState(0);
   const [showVideo, setShowVideo] = useState(false);
+  const [volume, setVolume] = useState(() => getGlobalVolume());
   /** Deezer metadata for the current song (title / artist / album / hi-res art). */
   const [meta, setMeta] = useState<DeezerMeta | null>(null);
 
