@@ -76,6 +76,7 @@ export interface YouTubePlayerRef {
   seekTo: (seconds: number) => void;
   getDuration: () => number;
   getCurrentTime: () => number;
+  setVolume?: (value: number) => void;
 }
 
 let isAPILoaded = false;
@@ -222,6 +223,9 @@ export const YouTubePlayer = forwardRef<YouTubePlayerRef, YouTubePlayerProps>(
         try {
           return playerRef.current?.getCurrentTime() || 0;
         } catch { return 0; }
+      },
+      setVolume: (value: number) => {
+        try { (playerRef.current as any)?.setVolume?.(Math.round(value * 100)); } catch { /* ignore */ }
       },
     }));
 

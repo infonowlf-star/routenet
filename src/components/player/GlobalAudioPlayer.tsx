@@ -853,6 +853,25 @@ export function getGlobalCurrentTime(): number {
   return getGlobalPlayerRef()?.getCurrentTime() || 0;
 }
 
+/** 0..1 volume applied to whichever backend is currently playing. */
+export function setGlobalVolume(value: number) {
+  const v = Math.min(1, Math.max(0, value));
+  try { localStorage.setItem("routenet_volume", String(v)); } catch { /* ignore */ }
+  const audio = (window as any).__globalAudioRef?.current as HTMLAudioElement | null;
+  if (audio) audio.volume = v;
+  getGlobalPlayerRef()?.setVolume?.(v);
+}
+
+export function getGlobalVolume(): number {
+  const audio = (window as any).__globalAudioRef?.current as HTMLAudioElement | null;
+  if (audio && typeof audio.volume === "number") return audio.volume;
+  try {
+    const raw = localStorage.getItem("routenet_volume");
+    if (raw !== null) return Math.min(1, Math.max(0, Number(raw)));
+  } catch { /* ignore */ }
+  return 1;
+}
+
 export function getGlobalDuration(): number {
   const isPiped = (window as any).__isUsingPipedAudio?.();
   if (isPiped) {

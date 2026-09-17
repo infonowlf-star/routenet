@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowDownCircle, ChevronDown, Heart, Loader2, ListMusic, Mic2, MoreHorizontal, Pause, Play, Plus, Repeat, Repeat1, Share2, Shuffle, SkipBack, SkipForward } from "lucide-react";
+import { ArrowDownCircle, ChevronDown, Heart, Loader2, ListMusic, MessageSquareQuote, MoreHorizontal, Pause, Play, Plus, Repeat, Repeat1, Share2, Shuffle, SkipBack, SkipForward, Volume1, Volume2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { AddToPlaylistDialog } from "@/components/AddToPlaylistDialog";
 import { ShareSheet } from "@/components/ShareSheet";
-import { getCachedYouTubeId, seekGlobalAudio } from "@/components/player/GlobalAudioPlayer";
+import { getCachedYouTubeId, getGlobalVolume, seekGlobalAudio, setGlobalVolume } from "@/components/player/GlobalAudioPlayer";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { usePlayer } from "@/context/PlayerContext";
@@ -39,10 +39,13 @@ export default function NowPlaying() {
   const [downloadStatus, setDownloadStatus] = useState<"idle" | "downloading" | "done" | "failed">("idle");
   const [downloadPercent, setDownloadPercent] = useState(0);
   const [showVideo, setShowVideo] = useState(false);
+  const [volume, setVolume] = useState(() => getGlobalVolume());
   /** Deezer metadata for the current song (title / artist / album / hi-res art). */
   const [meta, setMeta] = useState<DeezerMeta | null>(null);
 
   useEffect(() => setLocalProgress(progress), [progress]);
+  // Re-apply the saved volume whenever the playback backend swaps tracks.
+  useEffect(() => { setGlobalVolume(volume); }, [currentTrack?.id, volume]);
   // Snap the ring back to zero the instant the user skips forward/back.
   useEffect(() => setLocalProgress(0), [currentTrack?.id]);
 
@@ -149,153 +152,130 @@ export default function NowPlaying() {
         />
       </AnimatePresence>
 
-      {/* Top bar — centred title + artist */}
-      <header className="relative z-10 flex shrink-0 items-center justify-between gap-2 px-4 pt-[calc(0.75rem+env(safe-area-inset-top))]">
-        <Button variant="ghost" size="icon" onClick={() => navigate(-1)} aria-label="Back" className="rounded-full text-foreground hover:bg-foreground/10">
-          <ChevronDown className="h-6 w-6" />
+      {/* Grabber + collapse */}
+      <header className="relative z-10 flex shrink-0 items-center justify-between px-4 pt-[calc(0.5rem+env(safe-area-inset-top))]">
+        <Button variant="ghost" size="icon" onClick={() => navigate(-1)} aria-label="Back" className="rounded-full text-foreground/70 hover:bg-foreground/10">
+          <ChevronDown className="h-5 w-5" />
         </Button>
-        <motion.div
-          key={currentTrack.id}
-          initial={{ opacity: 0, y: 6 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.22 }}
-          className="min-w-0 flex-1 text-center"
-        >
-          <h1 className="truncate text-[16px] font-bold leading-tight text-foreground">{toTitleCase(display.title)}</h1>
-          <button onClick={() => navigate(`/artist/${encodeURIComponent(display.artist)}`)} className="mx-auto block max-w-full truncate text-[12px] font-normal text-muted-foreground transition-colors hover:text-foreground">
-            {toTitleCase(display.artist)}
-          </button>
-        </motion.div>
-        <Button variant="ghost" size="icon" onClick={() => setShowMore(true)} aria-label="More" className="rounded-full text-foreground hover:bg-foreground/10">
-          <MoreHorizontal className="h-6 w-6" />
-        </Button>
+        <span className="h-[5px] w-9 rounded-full bg-foreground/30" />
+        <span className="h-9 w-9" />
       </header>
 
-      {/* Old-school vinyl artwork inside a progress ring */}
-      <section className="relative z-10 flex min-h-0 flex-1 items-center justify-center px-6 pb-2 pt-2">
+      <div className="relative z-10 flex min-h-0 flex-1 flex-col justify-center px-7">
+        {/* Square artwork */}
         <motion.div
           key={currentTrack.id}
-          initial={{ scale: 0.94, opacity: 0 }}
+          initial={{ scale: 0.96, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
-          transition={{ type: "spring", stiffness: 220, damping: 24 }}
-          className="relative aspect-square w-[min(76vw,40dvh,320px)]"
+          transition={{ type: "spring", stiffness: 240, damping: 26 }}
+          className="mx-auto aspect-square w-full max-w-[min(78vw,44dvh)] overflow-hidden rounded-[10px] shadow-[0_18px_50px_-12px_hsl(0_0%_0%/0.7)]"
         >
-          <svg viewBox="0 0 100 100" className="absolute inset-0 h-full w-full -rotate-90">
-            <circle cx="50" cy="50" r={RING_R} fill="none" stroke="hsl(var(--foreground) / 0.12)" strokeWidth="2.5" />
-            <circle
-              cx="50" cy="50" r={RING_R} fill="none"
-              stroke="hsl(var(--primary))" strokeWidth="2.5" strokeLinecap="round"
-              strokeDasharray={RING_C}
-              strokeDashoffset={RING_C * (1 - Math.min(Math.max(localProgress, 0), 1))}
-            />
-          </svg>
-
-          {/* Vinyl disc */}
-          <motion.div
-            className="absolute inset-[6%] overflow-hidden rounded-full album-shadow"
-            style={{ background: "radial-gradient(circle at 50% 50%, hsl(0 0% 8%) 0%, hsl(0 0% 4%) 100%)" }}
-            animate={isPlaying ? { rotate: 360 } : { rotate: 0 }}
-            transition={isPlaying ? { duration: 14, repeat: Infinity, ease: "linear" } : { duration: 0.4 }}
-          >
-            {/* Grooves */}
-            <div
-              className="pointer-events-none absolute inset-0 rounded-full opacity-70"
-              style={{
-                background:
-                  "repeating-radial-gradient(circle at 50% 50%, hsl(0 0% 100% / 0.075) 0px, hsl(0 0% 100% / 0.075) 1px, transparent 1px, transparent 5px)",
-              }}
-            />
-            {/* Sheen */}
-            <div
-              className="pointer-events-none absolute inset-0 rounded-full"
-              style={{ background: "linear-gradient(115deg, hsl(0 0% 100% / 0.14) 0%, transparent 38%, transparent 62%, hsl(0 0% 100% / 0.08) 100%)" }}
-            />
-            {/* Centre label = artwork */}
-            <div className="absolute inset-[14%] overflow-hidden rounded-full border border-foreground/15 bg-card shadow-[0_6px_20px_-6px_hsl(0_0%_0%/0.8)]">
-              {isResolving ? (
-                <div className="flex h-full w-full items-center justify-center bg-secondary">
-                  <Loader2 className="h-7 w-7 animate-spin text-primary" />
-                </div>
-              ) : (
-                <img src={display.artwork} alt={display.title} className="h-full w-full object-cover" />
-              )}
+          {isResolving ? (
+            <div className="flex h-full w-full items-center justify-center bg-secondary">
+              <Loader2 className="h-7 w-7 animate-spin text-primary" />
             </div>
-            {/* Spindle hole */}
-            <div className="absolute left-1/2 top-1/2 h-[4.5%] w-[4.5%] -translate-x-1/2 -translate-y-1/2 rounded-full bg-background shadow-[inset_0_0_3px_hsl(0_0%_0%/0.9)]" />
-          </motion.div>
+          ) : (
+            <img src={display.artwork} alt={display.title} className="h-full w-full object-cover" />
+          )}
         </motion.div>
-      </section>
 
-
-      {/* Actions row */}
-      <section className="relative z-10 shrink-0 px-6">
-        <div className="flex items-center justify-between">
-          <Button variant="ghost" size="icon" onClick={() => navigate("/queue")} aria-label="Open queue" className="rounded-full text-muted-foreground hover:bg-foreground/10 hover:text-foreground">
-            <ListMusic className="h-[22px] w-[22px]" />
-          </Button>
-          <div className="flex shrink-0 items-center gap-1">
-            <Button variant="ghost" size="icon" onClick={() => setShowPlaylistDialog(true)} aria-label="Add to playlist" className="rounded-full text-muted-foreground hover:bg-foreground/10">
-              <Plus className="h-[22px] w-[22px]" />
-            </Button>
-            <Button variant="ghost" size="icon" onClick={handleToggleLike} aria-label="Like" className={cn("rounded-full text-muted-foreground hover:bg-foreground/10", liked && "text-primary")}>
-              <Heart className="h-[22px] w-[22px]" fill={liked ? "currentColor" : "none"} />
-            </Button>
+        {/* Title row */}
+        <div className="mt-7 flex items-center gap-3">
+          <div className="min-w-0 flex-1">
+            <h1 className="truncate text-[21px] font-semibold leading-tight text-foreground">{toTitleCase(display.title)}</h1>
+            <button
+              onClick={() => navigate(`/artist/${encodeURIComponent(display.artist)}`)}
+              className="block max-w-full truncate text-[21px] font-normal leading-tight text-foreground/60 transition-colors hover:text-foreground"
+            >
+              {toTitleCase(display.artist)}
+            </button>
+          </div>
+          <div className="flex shrink-0 items-center gap-1.5">
+            <button
+              onClick={handleToggleLike}
+              aria-label="Like"
+              className={cn("flex h-8 w-8 items-center justify-center rounded-full bg-foreground/15 text-foreground/80", liked && "text-primary")}
+            >
+              <Heart className="h-[15px] w-[15px]" fill={liked ? "currentColor" : "none"} />
+            </button>
+            <button
+              onClick={() => setShowMore(true)}
+              aria-label="More"
+              className="flex h-8 w-8 items-center justify-center rounded-full bg-foreground/15 text-foreground/80"
+            >
+              <MoreHorizontal className="h-[17px] w-[17px]" />
+            </button>
           </div>
         </div>
-      </section>
 
-
-      {/* Control deck */}
-      <section className="relative z-10 shrink-0 px-6 pt-3">
-        <Slider
-          value={[localProgress * 100]}
-          max={100}
-          step={0.05}
-          aria-label="Seek"
-          onValueChange={([value]) => handleSeek(value / 100)}
-          className="py-1.5 [&_[role=slider]]:h-3 [&_[role=slider]]:w-3"
-        />
-        <div className="mt-0.5 flex items-center justify-between text-[11px] tabular-nums text-muted-foreground">
-          <span aria-label="Elapsed time">{formatTime(currentTime)}</span>
-          <span aria-label="Total time">{formatTime(actualDuration)}</span>
+        {/* Thin progress bar */}
+        <div className="mt-5">
+          <Slider
+            value={[localProgress * 100]}
+            max={100}
+            step={0.05}
+            aria-label="Seek"
+            onValueChange={([value]) => handleSeek(value / 100)}
+            className="py-1 [&_[role=slider]]:h-2.5 [&_[role=slider]]:w-2.5 [&_[role=slider]]:border-0 [&>span]:h-[4px]"
+          />
+          <div className="mt-1 flex items-center justify-between text-[11px] tabular-nums text-foreground/45">
+            <span aria-label="Elapsed time">{formatTime(currentTime)}</span>
+            <span aria-label="Remaining time">-{formatTime(Math.max(0, actualDuration - currentTime))}</span>
+          </div>
         </div>
 
-        <div className="mt-4 flex items-center justify-between">
-          <Button variant="ghost" size="icon" onClick={toggleShuffle} aria-label="Shuffle" aria-pressed={shuffle} className={cn("h-11 w-11 rounded-full text-muted-foreground hover:bg-foreground/10 hover:text-foreground", shuffle && "text-primary")}>
-            <Shuffle className="h-5 w-5" />
-          </Button>
-          <Button variant="ghost" size="icon" onClick={previous} aria-label="Previous track" className="h-12 w-12 rounded-full text-foreground transition-transform duration-150 hover:bg-foreground/10 active:scale-[0.82] active:bg-foreground/15">
-            <SkipBack className="h-7 w-7" fill="currentColor" />
-          </Button>
-          <Button
+        {/* Transport */}
+        <div className="mt-6 flex items-center justify-center gap-14">
+          <button onClick={previous} aria-label="Previous track" className="text-foreground transition-transform active:scale-[0.85]">
+            <SkipBack className="h-[34px] w-[34px]" fill="currentColor" />
+          </button>
+          <button
             onClick={togglePlay}
             disabled={isResolving}
             aria-label={isPlaying ? "Pause" : "Play"}
-            className="flex h-[64px] w-[64px] items-center justify-center rounded-full bg-foreground p-0 text-background shadow-[0_10px_30px_-10px_hsl(var(--foreground)/0.5)] transition-transform duration-150 hover:scale-[1.03] active:scale-[0.88]"
+            className="text-foreground transition-transform active:scale-[0.85] disabled:opacity-60"
           >
-            {isResolving ? <Loader2 className="h-7 w-7 animate-spin" /> : isPlaying ? <Pause className="h-7 w-7" fill="currentColor" /> : <Play className="ml-1 h-7 w-7" fill="currentColor" />}
-          </Button>
-          <Button variant="ghost" size="icon" onClick={next} aria-label="Next track" className="h-12 w-12 rounded-full text-foreground transition-transform duration-150 hover:bg-foreground/10 active:scale-[0.82] active:bg-foreground/15">
-            <SkipForward className="h-7 w-7" fill="currentColor" />
-          </Button>
-          <Button variant="ghost" size="icon" onClick={toggleRepeat} aria-label={`Repeat: ${repeat}`} className={cn("h-11 w-11 rounded-full text-muted-foreground hover:bg-foreground/10 hover:text-foreground", repeat !== "off" && "text-primary")}>
-            {repeat === "one" ? <Repeat1 className="h-5 w-5" /> : <Repeat className="h-5 w-5" />}
-          </Button>
+            {isResolving ? <Loader2 className="h-[42px] w-[42px] animate-spin" /> : isPlaying ? <Pause className="h-[42px] w-[42px]" fill="currentColor" /> : <Play className="h-[42px] w-[42px]" fill="currentColor" />}
+          </button>
+          <button onClick={next} aria-label="Next track" className="text-foreground transition-transform active:scale-[0.85]">
+            <SkipForward className="h-[34px] w-[34px]" fill="currentColor" />
+          </button>
         </div>
 
-      </section>
+        {/* Volume row */}
+        <div className="mt-8 flex items-center gap-3">
+          <Volume1 className="h-4 w-4 shrink-0 text-foreground/45" />
+          <Slider
+            value={[volume * 100]}
+            max={100}
+            step={1}
+            aria-label="Volume"
+            onValueChange={([value]) => { setVolume(value / 100); setGlobalVolume(value / 100); }}
+            className="flex-1 [&_[role=slider]]:h-2.5 [&_[role=slider]]:w-2.5 [&_[role=slider]]:border-0 [&>span]:h-[4px]"
+          />
+          <Volume2 className="h-4 w-4 shrink-0 text-foreground/45" />
+        </div>
+      </div>
 
-      {/* Lyrics bar — anchored below every other control */}
-      <section className="relative z-10 mt-auto shrink-0 px-6 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-5 lg:pb-[6rem]">
-        <button
-          type="button"
-          onClick={() => navigate("/lyrics")}
-          className="flex w-full items-center justify-center rounded-xl bg-foreground/[0.07] px-4 py-3 transition-colors hover:bg-foreground/[0.12] active:scale-[0.99]"
-        >
-          <span className="flex items-center justify-center gap-2 text-center text-[14px] font-semibold text-foreground">
-            <Mic2 className="h-4 w-4" /> Show Lyrics
-          </span>
-        </button>
+      {/* Bottom icon bar */}
+      <section className="relative z-10 shrink-0 px-10 pb-[calc(0.9rem+env(safe-area-inset-bottom))] pt-5 lg:pb-[6rem]">
+        <div className="flex items-center justify-between">
+          <button onClick={() => navigate("/lyrics")} aria-label="Lyrics" className="text-foreground/70 transition-colors hover:text-foreground">
+            <MessageSquareQuote className="h-[22px] w-[22px]" />
+          </button>
+          <button onClick={toggleShuffle} aria-pressed={shuffle} aria-label="Shuffle" className={cn("text-foreground/70 transition-colors hover:text-foreground", shuffle && "text-primary")}>
+            <Shuffle className="h-[21px] w-[21px]" />
+          </button>
+          <button onClick={toggleRepeat} aria-label={`Repeat: ${repeat}`} className={cn("text-foreground/70 transition-colors hover:text-foreground", repeat !== "off" && "text-primary")}>
+            {repeat === "one" ? <Repeat1 className="h-[21px] w-[21px]" /> : <Repeat className="h-[21px] w-[21px]" />}
+          </button>
+          <button onClick={() => navigate("/queue")} aria-label="Queue" className="text-foreground/70 transition-colors hover:text-foreground">
+            <ListMusic className="h-[22px] w-[22px]" />
+          </button>
+        </div>
+        <p className="mt-2.5 truncate text-center text-[11px] font-medium text-foreground/40">
+          {nextTrack ? `Next: ${toTitleCase(nextTrack.title)}` : "routenet"}
+        </p>
       </section>
 
       <AnimatePresence>
