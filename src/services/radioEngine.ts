@@ -67,9 +67,14 @@ interface Suggestion {
   artist: string;
   role?: string;
   reason?: string;
+  /** Release year, when the curator reported one. */
+  year?: number;
+  /** "current" = released within the last 9 months. */
+  freshness?: string;
   /** Already-resolved metadata (local fallback path). */
   track?: Track;
 }
+
 
 /* ------------------------------------------------------------------ */
 /* Session state                                                       */
