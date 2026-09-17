@@ -183,13 +183,22 @@ Return a JSON object: { "tracks": [{ "title": string, "artist": string, "year": 
 
     const tracks = collected;
     const seen = new Set<string>();
+    const currentYear = new Date().getFullYear();
     const cleaned = tracks
-      .map((t: any) => ({
-        title: String(t?.title ?? "").trim(),
-        artist: String(t?.artist ?? "").trim(),
-        role: String(t?.role ?? "related").trim().toLowerCase().slice(0, 20),
-        reason: String(t?.reason ?? "").trim().slice(0, 140),
-      }))
+      .map((t: any) => {
+        const year = Number(t?.year) || 0;
+        const declared = String(t?.freshness ?? "").trim().toLowerCase();
+        const fresh = declared === "current" || (!declared && year >= currentYear);
+        return {
+          title: String(t?.title ?? "").trim(),
+          artist: String(t?.artist ?? "").trim(),
+          year,
+          freshness: fresh ? "current" : "catalog",
+          role: String(t?.role ?? "related").trim().toLowerCase().slice(0, 20),
+          reason: String(t?.reason ?? "").trim().slice(0, 140),
+        };
+      })
+
       .filter((t: any) => {
         if (!t.title || !t.artist) return false;
         const k = `${t.title.toLowerCase()}|${t.artist.toLowerCase()}`;
