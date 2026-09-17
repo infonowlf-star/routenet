@@ -153,9 +153,13 @@ Return a JSON object: { "tracks": [{ "title": string, "artist": string, "year": 
     try {
       const results = await Promise.allSettled(
         Array.from({ length: chunkCount }, (_, i) =>
-          askOnce(perChunk, `Batch ${i + 1} of ${chunkCount} — make this batch distinct from the others.`),
+          askOnce(
+            perChunk,
+            `Batch ${i + 1} of ${chunkCount} — make this batch distinct from the others. At least ${Math.ceil(perChunk * 0.57)} items in this batch must be "current" (released in the last 9 months), mixing new singles with strong tracks from albums released in that window.`,
+          ),
         ),
       );
+
       let anyOk = false;
       for (const r of results) {
         if (r.status !== "fulfilled") continue;
