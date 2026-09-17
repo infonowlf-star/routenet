@@ -249,7 +249,7 @@ export default function NowPlaying() {
             step={1}
             aria-label="Volume"
             onValueChange={([value]) => { setVolume(value / 100); setGlobalVolume(value / 100); }}
-            className="flex-1 [&_[role=slider}]:hidden [&_[role=slider]]:h-2.5 [&_[role=slider]]:w-2.5 [&_[role=slider]]:border-0 [&>span]:h-[4px]"
+            className="flex-1 [&_[role=slider]]:h-2.5 [&_[role=slider]]:w-2.5 [&_[role=slider]]:border-0 [&>span]:h-[4px]"
           />
           <Volume2 className="h-4 w-4 shrink-0 text-foreground/45" />
         </div>
