@@ -35,11 +35,16 @@ export const SESSION_TTL_MS = 3 * 60 * 60 * 1000;
 
 /** Target composition of every queue. */
 const MIX = {
-  related: 0.3, trending: 0.2, recent: 0.15, fanfav: 0.15, classic: 0.1, hidden: 0.1,
+  related: 0.24, trending: 0.16, recent: 0.3, fanfav: 0.14, classic: 0.1, hidden: 0.06,
 } as const;
 type Bucket = keyof typeof MIX;
 /** DJ ordering cycle — the queue is laid out in this rotation. */
 const BUCKET_ORDER: Bucket[] = ["related", "trending", "fanfav", "recent", "classic", "hidden"];
+
+/** Minimum share of the queue released within the last 9 months. */
+const FRESH_TARGET = 0.57;
+/** Never place more than this many songs of the same freshness lane in a row. */
+const MAX_SAME_LANE_RUN = 2;
 
 /** A song can only come back after this long. */
 const COOLDOWN_MS = 6 * 60 * 60 * 1000;
@@ -56,14 +61,20 @@ const MAX_PER_ARTIST = 2;
 /** How many songs get Deezer artwork before the queue is handed to the player. */
 const EAGER_ENRICH = 12;
 
+
 interface Suggestion {
   title: string;
   artist: string;
   role?: string;
   reason?: string;
+  /** Release year, when the curator reported one. */
+  year?: number;
+  /** "current" = released within the last 9 months. */
+  freshness?: string;
   /** Already-resolved metadata (local fallback path). */
   track?: Track;
 }
+
 
 /* ------------------------------------------------------------------ */
 /* Session state                                                       */
@@ -345,8 +356,11 @@ async function askAI(
       artist: String(t?.artist || "").trim(),
       role: String(t?.role || "related").trim().toLowerCase(),
       reason: String(t?.reason || "").trim(),
+      year: Number(t?.year) || undefined,
+      freshness: String(t?.freshness || "").trim().toLowerCase(),
     }))
     .filter((t: Suggestion) => t.title && t.artist);
+
 }
 
 function bucketOf(role?: string): Bucket {
