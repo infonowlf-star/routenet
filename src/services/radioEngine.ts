@@ -356,8 +356,11 @@ async function askAI(
       artist: String(t?.artist || "").trim(),
       role: String(t?.role || "related").trim().toLowerCase(),
       reason: String(t?.reason || "").trim(),
+      year: Number(t?.year) || undefined,
+      freshness: String(t?.freshness || "").trim().toLowerCase(),
     }))
     .filter((t: Suggestion) => t.title && t.artist);
+
 }
 
 function bucketOf(role?: string): Bucket {
