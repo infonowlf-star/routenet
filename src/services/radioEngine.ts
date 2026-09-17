@@ -401,67 +401,147 @@ function prepare(list: Suggestion[], excludeKeys: Set<string>, strict = true): S
 }
 
 
-/** Pick the target number per bucket, then interleave in DJ rotation. */
+/* ---------------- Intelligent constrained shuffle ---------------- */
+
+const CURRENT_YEAR = new Date().getFullYear();
+
+/** True when the song counts toward the "last 9 months" freshness target. */
+function isFresh(c: Scored): boolean {
+  const f = (c.freshness || "").toLowerCase();
+  if (f.startsWith("current") || f.startsWith("new") || f.startsWith("recent")) return true;
+  if (c.year && c.year >= CURRENT_YEAR) return true;
+  return c.bucket === "recent";
+}
+
+/** Rough energy proxy so the order alternates instead of flatlining. */
+function energyOf(c: Scored): number {
+  switch (c.bucket) {
+    case "trending": return 0.85;
+    case "recent": return 0.75;
+    case "fanfav": return 0.65;
+    case "related": return 0.55;
+    case "classic": return 0.4;
+    default: return 0.3;
+  }
+}
+
+/** Multi-signal desirability score — higher lands earlier in the queue. */
+function scoreOf(c: Scored): number {
+  let s = 0;
+  s += (MIX[c.bucket] ?? 0.1) * 2;                       // wanted composition
+  if (isFresh(c)) s += 0.55;                              // recency
+  if (c.year) s += Math.max(0, 0.35 - (CURRENT_YEAR - c.year) * 0.035); // decay
+  if (c.reason) s += 0.08;                                // curator gave rationale
+  const dist = artistDistance(c.artist);
+  s += dist === Infinity ? 0.4 : Math.min(0.4, dist / 40); // unheard artists first
+  s += Math.random() * 0.22;                              // natural variation
+  return s;
+}
+
+/**
+ * Build the final order: quota-aware bucket rotation with hard constraints —
+ * artist spacing, max songs per artist, no same album back to back, no long
+ * runs of the same freshness lane, alternating energy, and a >=57% share of
+ * recent music spread naturally across the whole queue.
+ */
 function arrange(pool: Scored[], limit: number): Scored[] {
+  const ranked = [...pool].sort((a, b) => scoreOf(b) - scoreOf(a));
+
   const byBucket = new Map<Bucket, Scored[]>();
   BUCKET_ORDER.forEach((b) => byBucket.set(b, []));
-  for (const c of pool) byBucket.get(c.bucket)!.push(c);
+  for (const c of ranked) byBucket.get(c.bucket)!.push(c);
 
-  // Enforce the target distribution, borrowing from `related` when short.
   const quota = new Map<Bucket, number>();
   BUCKET_ORDER.forEach((b) => quota.set(b, Math.round(MIX[b] * limit)));
 
   const picked: Scored[] = [];
   const perArtist = new Map<string, number>();
   const lastIndexByArtist = new Map<string, number>();
-  const leftovers: Scored[] = [];
+  let freshCount = 0;
+  let laneRun = 0;
+  let lastFresh: boolean | null = null;
+  const freshTarget = Math.ceil(FRESH_TARGET * limit);
 
-  const canTake = (c: Scored, position: number) => {
+  const albumOf = (c: Scored) => `${artistKey(c.artist)}::${(c.track?.album || "").toLowerCase()}`;
+
+  const violates = (c: Scored, relax: number): boolean => {
     const a = artistKey(c.artist);
-    if ((perArtist.get(a) || 0) >= MAX_PER_ARTIST) return false;
+    if ((perArtist.get(a) || 0) >= MAX_PER_ARTIST + (relax > 1 ? 1 : 0)) return true;
     const last = lastIndexByArtist.get(a);
-    if (last !== undefined && position - last < MIN_ARTIST_GAP) return false;
-    return true;
+    const gap = Math.max(2, MIN_ARTIST_GAP - relax * 3);
+    if (last !== undefined && picked.length - last < gap) return true;
+    if (relax === 0) {
+      const prev = picked[picked.length - 1];
+      if (prev && (prev.track?.album || "") && albumOf(prev) === albumOf(c)) return true;
+      // Never stack more than MAX_SAME_LANE_RUN of one freshness lane.
+      const fresh = isFresh(c);
+      if (lastFresh === fresh && laneRun >= MAX_SAME_LANE_RUN) return true;
+      // Keep the energy moving.
+      if (prev && Math.abs(energyOf(prev) - energyOf(c)) < 0.02 && picked.length > 2) {
+        const before = picked[picked.length - 2];
+        if (before && Math.abs(energyOf(before) - energyOf(c)) < 0.02) return true;
+      }
+    }
+    return false;
   };
 
   const commit = (c: Scored) => {
     const a = artistKey(c.artist);
     perArtist.set(a, (perArtist.get(a) || 0) + 1);
     lastIndexByArtist.set(a, picked.length);
+    const fresh = isFresh(c);
+    if (fresh) freshCount += 1;
+    laneRun = lastFresh === fresh ? laneRun + 1 : 1;
+    lastFresh = fresh;
     picked.push(c);
+    const list = byBucket.get(c.bucket)!;
+    const i = list.indexOf(c);
+    if (i >= 0) list.splice(i, 1);
+    quota.set(c.bucket, (quota.get(c.bucket) || 0) - 1);
   };
 
-  // Round-robin the buckets in DJ rotation until the queue is full.
+  /** Remaining slots vs. remaining fresh songs still needed. */
+  const needsFresh = () => freshTarget - freshCount >= limit - picked.length;
+
+  const pickFrom = (candidates: Scored[], relax: number): Scored | undefined => {
+    const wantFresh = needsFresh();
+    if (wantFresh) {
+      const f = candidates.find((c) => isFresh(c) && !violates(c, relax));
+      if (f) return f;
+    }
+    return candidates.find((c) => !violates(c, relax));
+  };
+
+  let cursor = 0;
   let guard = 0;
-  while (picked.length < limit && guard++ < limit * 8) {
-    let advanced = false;
-    for (const bucket of BUCKET_ORDER) {
-      if (picked.length >= limit) break;
+  while (picked.length < limit && guard++ < limit * 10) {
+    let placed = false;
+    for (let step = 0; step < BUCKET_ORDER.length && !placed; step++) {
+      const bucket = BUCKET_ORDER[(cursor + step) % BUCKET_ORDER.length];
       const list = byBucket.get(bucket)!;
       if (!list.length) continue;
       if ((quota.get(bucket) || 0) <= 0 && pool.length > limit) continue;
-      const idx = list.findIndex((c) => canTake(c, picked.length));
-      if (idx === -1) continue;
-      const [c] = list.splice(idx, 1);
-      quota.set(bucket, (quota.get(bucket) || 0) - 1);
-      commit(c);
-      advanced = true;
+      const choice = pickFrom(list, 0);
+      if (!choice) continue;
+      commit(choice);
+      cursor = (cursor + step + 1) % BUCKET_ORDER.length;
+      placed = true;
     }
-    if (!advanced) {
-      // Quotas exhausted or spacing blocked everything — relax and refill.
+    if (placed) continue;
+
+    // Relax progressively rather than dropping songs.
+    let recovered = false;
+    for (let relax = 1; relax <= 3 && !recovered; relax++) {
       const rest = BUCKET_ORDER.flatMap((b) => byBucket.get(b)!);
       if (!rest.length) break;
-      BUCKET_ORDER.forEach((b) => quota.set(b, quota.get(b)! + Math.ceil(limit / 6)));
-      const next = rest.find((c) => canTake(c, picked.length));
-      if (!next) { leftovers.push(...rest); break; }
-      byBucket.get(next.bucket)!.splice(byBucket.get(next.bucket)!.indexOf(next), 1);
-      commit(next);
+      BUCKET_ORDER.forEach((b) => quota.set(b, (quota.get(b) || 0) + Math.ceil(limit / 6)));
+      const next = pickFrom(rest, relax);
+      if (next) { commit(next); recovered = true; }
     }
+    if (!recovered) break;
   }
 
-  // Prefer artists that are OFF cooldown near the front of the queue.
-  const front = picked.slice(0, 12).sort((a, b) => artistDistance(b.artist) - artistDistance(a.artist));
-  return [...front, ...picked.slice(12)].slice(0, limit);
+  return picked.slice(0, limit);
 }
 
 function toTrack(s: Scored, seed?: Track | null): Track {
