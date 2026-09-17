@@ -44,6 +44,8 @@ export default function NowPlaying() {
   const [meta, setMeta] = useState<DeezerMeta | null>(null);
 
   useEffect(() => setLocalProgress(progress), [progress]);
+  // Re-apply the saved volume whenever the playback backend swaps tracks.
+  useEffect(() => { setGlobalVolume(volume); }, [currentTrack?.id, volume]);
   // Snap the ring back to zero the instant the user skips forward/back.
   useEffect(() => setLocalProgress(0), [currentTrack?.id]);
 
