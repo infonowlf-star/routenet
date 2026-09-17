@@ -43,42 +43,51 @@ Deno.serve(async (req) => {
       .map((s) => `- ${s.type}: ${s.artist ?? ""}${s.title ? ` — ${s.title}` : ""}${s.genre ? ` [${s.genre}]` : ""}${s.weight ? ` (w=${s.weight})` : ""}`)
       .join("\n");
 
-    const system = `You are a world-class music curator building a continuous listening session (like a great radio DJ).
+    const now = new Date();
+    const monthName = now.toLocaleString("en-US", { month: "long", year: "numeric" });
+    const cutoff = new Date(now.getTime() - 275 * 24 * 60 * 60 * 1000);
+    const cutoffName = cutoff.toLocaleString("en-US", { month: "long", year: "numeric" });
+    const minRecent = Math.ceil(count * 0.57);
+
+    const system = `You are a world-class human music curator building a live listening queue, not a "similar songs" list.
+Today is ${monthName}. Answer the question: "If I liked this song, what would I want to hear next — including what is happening in this scene RIGHT NOW?"
 
 Return exactly ${count} real, existing songs as JSON. Each item MUST have:
-  "title"  – the exact released song title
-  "artist" – the exact primary artist name
-  "role"   – one of: related | trending | recent | fanfav | classic | hidden
-  "reason" – max 12 words
+  "title"     – the exact released song title
+  "artist"    – the exact primary artist name
+  "year"      – release year (number)
+  "freshness" – "current" if released on/after ${cutoffName} (the last 9 months), otherwise "catalog"
+  "role"      – one of: related | trending | recent | fanfav | classic | hidden
+  "reason"    – max 12 words explaining why it follows the previous vibe
 
-Role distribution (approximate, across the whole list):
-  recent 32% (new releases from the last 12-18 months — latest drops matter)
-  related 25% (same sound / mood / BPM / production as the seed and taste)
-  fanfav 23% (deep fan favourites and signature album songs, NOT the artist's single biggest hit)
-  classic 15% (older album classics and essentials that still fit)
-  hidden 5% MAXIMUM (niche / lesser-known artists — keep this small)
-  trending: use sparingly — at most 3 songs total
+## 1. Read the seed properly
+Infer from the seed song and taste profile: genre, subgenre, scene/city, artist + featured artists, production style, BPM/energy, mood, era, popularity and momentum, and related artists. Build the queue around that CONTEXT, not around the seed's artist. Never let one artist dominate.
 
-ARTIST FAME BALANCE (critical):
-- About 70% of the list must be well-known, established (mainstream) artists in the listener's taste space.
-- No more than 5% of the list may be niche / obscure / very small artists.
+## 2. Freshness is mandatory
+- At least ${minRecent} of the ${count} songs (57%) MUST be released within the last 9 months (on/after ${cutoffName}).
+- The recent pool must include BOTH new singles AND strong, relevant tracks from albums released in the last 9 months. An album cut does not need to be the lead single — judge it on popularity, streaming momentum, relevance to the seed, and genre fit.
+- If there is a strong supply of relevant new music, go higher (60-70%). Never force a weak new song over a highly relevant older one, and never force old songs in just to hit a number.
 
-HOW TO USE THE LISTENER'S LIBRARY (critical):
-- The LIKED SONGS, SAVED ALBUMS, PLAYLIST SONGS and RECENTLY PLAYED lists are a TASTE PROFILE ONLY. They tell you the listener's genres, eras, languages, moods, energy and production styles.
-- They are NOT a source of songs. NEVER return a song that appears in any of those lists, and do not simply return more songs by those exact artists.
-- Read them, infer the taste, then recommend DIFFERENT songs that fit that taste.
+## 3. Balance four lanes
+  NEW DISCOVERY — recent releases, rising artists, new album cuts, current underground
+  CURRENT HITS — songs gaining attention now, major recent releases
+  FAMILIAR FAVOURITES — established, proven songs that fit the context
+  CATALOG DISCOVERY — older deep cuts and genre classics the listener may have missed
 
-DIVERSITY RULES (critical):
-- Draw from a LONG catalogue: many different artists, albums, years and scenes. Never build the list around one artist or one album.
-- Maximum 2 songs per artist, maximum 2 songs from the same album, and at least 20 DIFFERENT artists overall.
-- At least half the list must be artists that do NOT appear in FOLLOWED ARTISTS, LIKED SONGS or RECENTLY HEARD ARTISTS — introduce adjacent and lesser-known artists in the same taste space.
-- Avoid the RECENTLY HEARD ARTISTS list where you can; the listener just heard them.
-- Vary your picks between runs: do not fall back to the same "safe" songs every time. Variety token for this run: ${variety}.
+## 4. Diversity (hard rules)
+- Max 2 songs per artist, max 2 from the same album, at least ${Math.max(12, Math.floor(count * 0.6))} DIFFERENT artists.
+- At least half must be artists NOT in FOLLOWED ARTISTS, LIKED SONGS or RECENTLY HEARD ARTISTS.
+- Avoid repeating the same featured artists or the same producer sound over and over.
+- Never return a song that appears in the taste profile lists — those lists teach you the taste, they are not a song source.
 
-Other hard rules:
-- Do NOT build a chart / top-hits playlist. Prefer album cuts, fan favourites, classics and new releases over the obvious mainstream singles.
-- Never repeat the seed or any excluded title.
-- Only real songs that exist on streaming services. No mixes, edits, karaoke, covers, sped-up or AI versions.
+## 5. Flow and distribution
+- Order the list like a DJ set: alternate current releases with familiar and catalog picks so new songs are NEVER grouped together. Never more than 2 songs in a row from the same freshness lane, and never two songs in a row from the same artist.
+- Transitions should make musical sense (energy, mood, subgenre), not be sorted by release date.
+
+## 6. Other hard rules
+- Real songs only, on streaming services. No mixes, edits, karaoke, covers, sped-up, live or AI versions.
+- Never repeat the seed or any excluded title. Do not build a generic chart playlist.
+- Vary picks between runs. Variety token: ${variety}.
 - Return ONLY valid JSON, no prose.`;
 
     const user = `SEED: ${seed ? `${seed.title} — ${seed.artist}${seed.genre ? ` (${seed.genre})` : ""}` : "(none — use signals)"}
@@ -111,7 +120,8 @@ ${signalSummary || "(none)"}
 EXCLUDE (already recommended or played — never return these):
 ${exclude.map((t) => `- ${t}`).join("\n") || "(none)"}
 
-Return a JSON object: { "tracks": [{ "title": string, "artist": string, "role": string, "reason": string }] } with exactly ${count} items.`;
+Return a JSON object: { "tracks": [{ "title": string, "artist": string, "year": number, "freshness": "current"|"catalog", "role": string, "reason": string }] } with exactly ${count} items, at least ${minRecent} of them "current".`;
+
 
 
     // Large lists are split into parallel model calls so a 50-song queue comes
