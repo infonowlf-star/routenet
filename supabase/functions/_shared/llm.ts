@@ -30,6 +30,14 @@ export interface ChatOptions {
   openRouterSingleAttempt?: boolean;
   /** Maximum time for the Lovable gateway request. */
   gatewayTimeoutMs?: number;
+  /**
+   * Ground the completion on live web results (OpenRouter `web` plugin).
+   * Required for "what is out right now" questions: model weights have a
+   * knowledge cutoff and otherwise return stale catalogue music.
+   */
+  webSearch?: boolean;
+  /** How many web results to ground on (default 5). */
+  webSearchResults?: number;
 }
 
 export interface ChatResult {
