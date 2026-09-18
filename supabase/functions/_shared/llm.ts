@@ -201,6 +201,16 @@ async function callOpenRouter(o: ChatOptions): Promise<string | null> {
       }
       // Low-credit accounts reject the request but tell us the affordable
       // budget — retry immediately within it instead of failing the feature.
+      // Web grounding costs extra credits and can time out — never let it kill
+      // the request; fall back to the plain call.
+      if (o.webSearch) {
+        try {
+          const text = await openRouterOnce({ ...o, webSearch: false }, model, timeoutMs);
+          if (text && text.trim()) return text;
+        } catch (e3) {
+          lastErr = e3;
+        }
+      }
       const afford = msg.match(/can only afford (\d+)/);
       if (afford) {
         const budget = Math.max(400, Number(afford[1]) - 50);
