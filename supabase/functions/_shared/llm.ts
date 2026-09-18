@@ -30,6 +30,14 @@ export interface ChatOptions {
   openRouterSingleAttempt?: boolean;
   /** Maximum time for the Lovable gateway request. */
   gatewayTimeoutMs?: number;
+  /**
+   * Ground the completion on live web results (OpenRouter `web` plugin).
+   * Required for "what is out right now" questions: model weights have a
+   * knowledge cutoff and otherwise return stale catalogue music.
+   */
+  webSearch?: boolean;
+  /** How many web results to ground on (default 5). */
+  webSearchResults?: number;
 }
 
 export interface ChatResult {
@@ -137,6 +145,18 @@ async function openRouterOnce(
       // Free / low-credit OpenRouter accounts cap the affordable token budget,
       // so always send an explicit modest max_tokens instead of the model max.
       max_tokens: maxTokensOverride ?? Math.min(o.maxOutputTokens ?? 8000, 8000),
+      ...(o.webSearch
+        ? {
+          plugins: [
+            {
+              id: "web",
+              max_results: o.webSearchResults ?? 5,
+              search_prompt:
+                "Use these live web results to know which songs, singles and albums were actually released in the last 9 months. Only trust release dates found here.",
+            },
+          ],
+        }
+        : {}),
       ...(o.temperature != null ? { temperature: o.temperature } : {}),
       ...(o.json === false ? {} : { response_format: { type: "json_object" } }),
     }),
@@ -181,6 +201,16 @@ async function callOpenRouter(o: ChatOptions): Promise<string | null> {
       }
       // Low-credit accounts reject the request but tell us the affordable
       // budget — retry immediately within it instead of failing the feature.
+      // Web grounding costs extra credits and can time out — never let it kill
+      // the request; fall back to the plain call.
+      if (o.webSearch) {
+        try {
+          const text = await openRouterOnce({ ...o, webSearch: false }, model, timeoutMs);
+          if (text && text.trim()) return text;
+        } catch (e3) {
+          lastErr = e3;
+        }
+      }
       const afford = msg.match(/can only afford (\d+)/);
       if (afford) {
         const budget = Math.max(400, Number(afford[1]) - 50);
