@@ -145,6 +145,18 @@ async function openRouterOnce(
       // Free / low-credit OpenRouter accounts cap the affordable token budget,
       // so always send an explicit modest max_tokens instead of the model max.
       max_tokens: maxTokensOverride ?? Math.min(o.maxOutputTokens ?? 8000, 8000),
+      ...(o.webSearch
+        ? {
+          plugins: [
+            {
+              id: "web",
+              max_results: o.webSearchResults ?? 5,
+              search_prompt:
+                "Use these live web results to know which songs, singles and albums were actually released in the last 9 months. Only trust release dates found here.",
+            },
+          ],
+        }
+        : {}),
       ...(o.temperature != null ? { temperature: o.temperature } : {}),
       ...(o.json === false ? {} : { response_format: { type: "json_object" } }),
     }),
