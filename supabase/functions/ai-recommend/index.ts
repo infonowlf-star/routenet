@@ -47,6 +47,7 @@ Deno.serve(async (req) => {
     const monthName = now.toLocaleString("en-US", { month: "long", year: "numeric" });
     const cutoff = new Date(now.getTime() - 275 * 24 * 60 * 60 * 1000);
     const cutoffName = cutoff.toLocaleString("en-US", { month: "long", year: "numeric" });
+    const cutoffKey = `${cutoff.getFullYear()}-${String(cutoff.getMonth() + 1).padStart(2, "0")}`;
     const minRecent = Math.ceil(count * 0.57);
 
     const system = `You are a world-class human music curator building a live listening queue, not a "similar songs" list.
@@ -55,18 +56,20 @@ Today is ${monthName}. Answer the question: "If I liked this song, what would I 
 Return exactly ${count} real, existing songs as JSON. Each item MUST have:
   "title"     – the exact released song title
   "artist"    – the exact primary artist name
+  "released"  – actual release month as "YYYY-MM" (best known; never guess an old date for a new song)
   "year"      – release year (number)
-  "freshness" – "current" if released on/after ${cutoffName} (the last 9 months), otherwise "catalog"
+  "freshness" – "current" if released on/after ${cutoffKey} (${cutoffName}, i.e. the last 9 months), otherwise "catalog"
   "role"      – one of: related | trending | recent | fanfav | classic | hidden
   "reason"    – max 12 words explaining why it follows the previous vibe
 
 ## 1. Read the seed properly
 Infer from the seed song and taste profile: genre, subgenre, scene/city, artist + featured artists, production style, BPM/energy, mood, era, popularity and momentum, and related artists. Build the queue around that CONTEXT, not around the seed's artist. Never let one artist dominate.
 
-## 2. Freshness is mandatory
-- At least ${minRecent} of the ${count} songs (57%) MUST be released within the last 9 months (on/after ${cutoffName}).
-- The recent pool must include BOTH new singles AND strong, relevant tracks from albums released in the last 9 months. An album cut does not need to be the lead single — judge it on popularity, streaming momentum, relevance to the seed, and genre fit.
-- If there is a strong supply of relevant new music, go higher (60-70%). Never force a weak new song over a highly relevant older one, and never force old songs in just to hit a number.
+## 2. Freshness is mandatory — this is the most important rule
+- At least ${minRecent} of the ${count} songs (57%+) MUST have been released on/after ${cutoffKey}. Aim for 60-70% when the supply of relevant new music is strong.
+- Do NOT return well-known older catalogue songs to fill the queue. If you are unsure whether a song is recent, do not label it "current".
+- The recent pool must include BOTH brand-new singles AND strong, relevant tracks from albums released in the last 9 months. An album cut does not need to be the lead single — judge it on popularity, streaming momentum, relevance to the seed, and genre fit.
+- Never force a weak new song over a highly relevant older one, and never force old songs in just to hit a number.
 
 ## 3. Balance four lanes
   NEW DISCOVERY — recent releases, rising artists, new album cuts, current underground
@@ -120,7 +123,7 @@ ${signalSummary || "(none)"}
 EXCLUDE (already recommended or played — never return these):
 ${exclude.map((t) => `- ${t}`).join("\n") || "(none)"}
 
-Return a JSON object: { "tracks": [{ "title": string, "artist": string, "year": number, "freshness": "current"|"catalog", "role": string, "reason": string }] } with exactly ${count} items, at least ${minRecent} of them "current".`;
+Return a JSON object: { "tracks": [{ "title": string, "artist": string, "released": "YYYY-MM", "year": number, "freshness": "current"|"catalog", "role": string, "reason": string }] } with exactly ${count} items, at least ${minRecent} of them released on/after ${cutoffKey}.`;
 
 
 
@@ -129,7 +132,7 @@ Return a JSON object: { "tracks": [{ "title": string, "artist": string, "year": 
     const chunkCount = Math.min(4, Math.max(1, Math.ceil(count / 14)));
     const perChunk = Math.ceil(count / chunkCount);
 
-    const askOnce = (n: number, seedNote: string) =>
+    const askOnce = (n: number, seedNote: string, webSearch = false) =>
       chatJson<any>({
         system: system.replace(`exactly ${count} real`, `exactly ${n} real`),
         user: `${user}\n\n${seedNote}\nReturn exactly ${n} items.`,
@@ -140,26 +143,22 @@ Return a JSON object: { "tracks": [{ "title": string, "artist": string, "year": 
         prefer: "openrouter",
         openRouterSingleAttempt: true,
         openRouterModel: "google/gemini-2.5-flash-lite",
-        openRouterTimeoutMs: 3500,
+        openRouterTimeoutMs: webSearch ? 9000 : 3500,
+        // Live web grounding for the freshness-critical batches: model weights
+        // have a knowledge cutoff and would otherwise return older music.
+        webSearch,
+        webSearchResults: 5,
         // Fast built-in fallback so a low-credit or slow OpenRouter route never
         // leaves the queue empty.
         gatewayModel: "google/gemini-3.1-flash-lite",
-        gatewayTimeoutMs: 6000,
+        gatewayTimeoutMs: webSearch ? 12000 : 6000,
         maxOutputTokens: 1500,
       });
 
     let provider = "openrouter";
     const collected: any[] = [];
-    try {
-      const results = await Promise.allSettled(
-        Array.from({ length: chunkCount }, (_, i) =>
-          askOnce(
-            perChunk,
-            `Batch ${i + 1} of ${chunkCount} — make this batch distinct from the others. At least ${Math.ceil(perChunk * 0.57)} items in this batch must be "current" (released in the last 9 months), mixing new singles with strong tracks from albums released in that window.`,
-          ),
-        ),
-      );
 
+    const harvest = (results: PromiseSettledResult<any>[]) => {
       let anyOk = false;
       for (const r of results) {
         if (r.status !== "fulfilled") continue;
@@ -169,7 +168,23 @@ Return a JSON object: { "tracks": [{ "title": string, "artist": string, "year": 
         const rows = Array.isArray(d?.tracks) ? d.tracks : Array.isArray(d) ? d : [];
         collected.push(...rows);
       }
-      if (!anyOk) {
+      return anyOk;
+    };
+
+    try {
+      const results = await Promise.allSettled(
+        Array.from({ length: chunkCount }, (_, i) =>
+          askOnce(
+            perChunk,
+            `Batch ${i + 1} of ${chunkCount} — make this batch distinct from the others. At least ${Math.ceil(perChunk * 0.57)} items in this batch must be released on/after ${cutoffKey} (the last 9 months), mixing brand-new singles with strong tracks from albums released in that window. Do not pad with older catalogue songs.`,
+            // Ground the first batch on live web results so the queue reflects
+            // what actually came out recently.
+            i === 0,
+          ),
+        ),
+      );
+
+      if (!harvest(results)) {
         const first = results.find((r) => r.status === "rejected") as PromiseRejectedResult | undefined;
         throw first?.reason ?? new Error("no completion");
       }
@@ -181,25 +196,36 @@ Return a JSON object: { "tracks": [{ "title": string, "artist": string, "year": 
       throw e;
     }
 
-    const tracks = collected;
     const seen = new Set<string>();
-    const currentYear = new Date().getFullYear();
-    const cleaned = tracks
-      .map((t: any) => {
-        const year = Number(t?.year) || 0;
-        const declared = String(t?.freshness ?? "").trim().toLowerCase();
-        const fresh = declared === "current" || (!declared && year >= currentYear);
-        return {
-          title: String(t?.title ?? "").trim(),
-          artist: String(t?.artist ?? "").trim(),
-          year,
-          freshness: fresh ? "current" : "catalog",
-          role: String(t?.role ?? "related").trim().toLowerCase().slice(0, 20),
-          reason: String(t?.reason ?? "").trim().slice(0, 140),
-        };
-      })
+    const currentYear = now.getFullYear();
 
-      .filter((t: any) => {
+    const normalize = (t: any) => {
+      const releasedRaw = String(t?.released ?? "").trim();
+      const m = releasedRaw.match(/^(\d{4})[-/ ]?(\d{2})?/);
+      const relYear = m ? Number(m[1]) : Number(t?.year) || 0;
+      const relMonth = m && m[2] ? Number(m[2]) : 0;
+      const year = Number(t?.year) || relYear;
+      // Verify recency from the actual date rather than trusting the label.
+      let fresh = false;
+      if (relYear) {
+        const key = `${relYear}-${String(relMonth || 12).padStart(2, "0")}`;
+        fresh = key >= cutoffKey;
+      } else {
+        fresh = String(t?.freshness ?? "").toLowerCase() === "current" && year >= currentYear;
+      }
+      return {
+        title: String(t?.title ?? "").trim(),
+        artist: String(t?.artist ?? "").trim(),
+        year: year || relYear,
+        released: releasedRaw.slice(0, 7),
+        freshness: fresh ? "current" : "catalog",
+        role: String(t?.role ?? "related").trim().toLowerCase().slice(0, 20),
+        reason: String(t?.reason ?? "").trim().slice(0, 140),
+      };
+    };
+
+    const dedupe = (rows: any[]) =>
+      rows.filter((t) => {
         if (!t.title || !t.artist) return false;
         const k = `${t.title.toLowerCase()}|${t.artist.toLowerCase()}`;
         if (seen.has(k)) return false;
@@ -207,7 +233,65 @@ Return a JSON object: { "tracks": [{ "title": string, "artist": string, "year": 
         return true;
       });
 
-    return json({ tracks: cleaned, provider });
+    let cleaned = dedupe(collected.map(normalize));
+
+    // Top-up round: if the verified recent share is short, ask once more for
+    // last-9-months releases only, grounded on live web results.
+    let freshRows = cleaned.filter((t) => t.freshness === "current");
+    if (freshRows.length < minRecent) {
+      const need = Math.min(count, minRecent - freshRows.length + 4);
+      try {
+        const topUp = await askOnce(
+          need,
+          `TOP-UP ROUND: EVERY item must have been released on/after ${cutoffKey} (the last 9 months) — new singles and strong tracks from albums released in that window. No catalogue songs at all. Avoid these already chosen: ${cleaned.map((t) => `${t.title} — ${t.artist}`).slice(0, 60).join("; ")}`,
+          true,
+        );
+        const d: any = topUp.data;
+        const rows = Array.isArray(d?.tracks) ? d.tracks : Array.isArray(d) ? d : [];
+        cleaned = cleaned.concat(dedupe(rows.map(normalize).filter((t: any) => t.freshness === "current")));
+      } catch (e) {
+        console.error("[ai-recommend] top-up failed", String(e));
+      }
+      freshRows = cleaned.filter((t) => t.freshness === "current");
+    }
+
+    // Pick a recency-weighted set, then weave fresh and catalog picks so new
+    // music is spread through the queue instead of grouped at the top.
+    const catalogRows = cleaned.filter((t) => t.freshness !== "current");
+    freshRows.sort((a, b) => (b.year || 0) - (a.year || 0));
+    const targetFresh = Math.min(freshRows.length, Math.max(minRecent, Math.ceil(count * 0.6)));
+    const pickFresh = freshRows.slice(0, targetFresh);
+    const pickCatalog = catalogRows.slice(0, Math.max(0, count - pickFresh.length));
+    const total = pickFresh.length + pickCatalog.length;
+
+    const woven: any[] = [];
+    let fi = 0, ci = 0;
+    let lastArtist = "";
+    const ratio = total ? pickFresh.length / total : 0;
+    for (let i = 0; i < total; i++) {
+      const wantFresh = ci >= pickCatalog.length ||
+        (fi < pickFresh.length && (fi + 1) / (i + 1) <= ratio);
+      let next = wantFresh ? pickFresh[fi] : pickCatalog[ci];
+      // Never two songs in a row by the same artist.
+      if (next && next.artist.toLowerCase() === lastArtist) {
+        const alt = wantFresh ? pickCatalog[ci] : pickFresh[fi];
+        if (alt && alt.artist.toLowerCase() !== lastArtist) {
+          next = alt;
+          if (wantFresh) ci++; else fi++;
+        } else if (wantFresh) fi++; else ci++;
+      } else if (wantFresh) fi++; else ci++;
+      if (!next) continue;
+      lastArtist = next.artist.toLowerCase();
+      woven.push(next);
+    }
+
+    return json({
+      tracks: woven.slice(0, count),
+      provider,
+      recentCount: woven.slice(0, count).filter((t) => t.freshness === "current").length,
+      minRecent,
+    });
+
 
   } catch (e) {
     console.error(e);
