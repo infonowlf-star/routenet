@@ -49,6 +49,7 @@ Deno.serve(async (req) => {
     const cutoffName = cutoff.toLocaleString("en-US", { month: "long", year: "numeric" });
     const cutoffKey = `${cutoff.getFullYear()}-${String(cutoff.getMonth() + 1).padStart(2, "0")}`;
     const minRecent = Math.ceil(count * 0.57);
+    const targetRecent = Math.ceil(count * 0.72);
 
     const system = `You are a world-class human music curator building a live listening queue, not a "similar songs" list.
 Today is ${monthName}. Answer the question: "If I liked this song, what would I want to hear next — including what is happening in this scene RIGHT NOW?"
@@ -66,8 +67,8 @@ Return exactly ${count} real, existing songs as JSON. Each item MUST have:
 Infer from the seed song and taste profile: genre, subgenre, scene/city, artist + featured artists, production style, BPM/energy, mood, era, popularity and momentum, and related artists. Build the queue around that CONTEXT, not around the seed's artist. Never let one artist dominate.
 
 ## 2. Freshness is mandatory — this is the most important rule
-- At least ${minRecent} of the ${count} songs (57%+) MUST have been released on/after ${cutoffKey}. Aim for 60-70% when the supply of relevant new music is strong.
-- Do NOT return well-known older catalogue songs to fill the queue. If you are unsure whether a song is recent, do not label it "current".
+- At least ${targetRecent} of the ${count} songs (72%+) MUST have been released on/after ${cutoffKey}. Recent releases must clearly dominate.
+- Use no more than ${count - targetRecent} catalog songs. Never use famous old songs as easy filler. If unsure about a release date, exclude the song.
 - The recent pool must include BOTH brand-new singles AND strong, relevant tracks from albums released in the last 9 months. An album cut does not need to be the lead single — judge it on popularity, streaming momentum, relevance to the seed, and genre fit.
 - Never force a weak new song over a highly relevant older one, and never force old songs in just to hit a number.
 
@@ -123,7 +124,7 @@ ${signalSummary || "(none)"}
 EXCLUDE (already recommended or played — never return these):
 ${exclude.map((t) => `- ${t}`).join("\n") || "(none)"}
 
-Return a JSON object: { "tracks": [{ "title": string, "artist": string, "released": "YYYY-MM", "year": number, "freshness": "current"|"catalog", "role": string, "reason": string }] } with exactly ${count} items, at least ${minRecent} of them released on/after ${cutoffKey}.`;
+Return a JSON object: { "tracks": [{ "title": string, "artist": string, "released": "YYYY-MM", "year": number, "freshness": "current"|"catalog", "role": string, "reason": string }] } with exactly ${count} items, at least ${targetRecent} of them released on/after ${cutoffKey}.`;
 
 
 
@@ -137,22 +138,22 @@ Return a JSON object: { "tracks": [{ "title": string, "artist": string, "release
         system: system.replace(`exactly ${count} real`, `exactly ${n} real`),
         user: `${user}\n\n${seedNote}\nReturn exactly ${n} items.`,
         json: true,
-        temperature: 0.9,
+        temperature: 0.55,
         // Keep recommendations on the fast OpenRouter path only. This avoids
         // provider hops and keeps the queue response inside the UI latency budget.
         prefer: "openrouter",
         openRouterSingleAttempt: true,
         openRouterModel: "google/gemini-2.5-flash-lite",
-        openRouterTimeoutMs: webSearch ? 9000 : 3500,
+        openRouterTimeoutMs: webSearch ? 12000 : 5000,
         // Live web grounding for the freshness-critical batches: model weights
         // have a knowledge cutoff and would otherwise return older music.
         webSearch,
-        webSearchResults: 5,
+        webSearchResults: 8,
         // Fast built-in fallback so a low-credit or slow OpenRouter route never
         // leaves the queue empty.
         gatewayModel: "google/gemini-3.1-flash-lite",
         gatewayTimeoutMs: webSearch ? 12000 : 6000,
-        maxOutputTokens: 1500,
+        maxOutputTokens: 1800,
       });
 
     let provider = "openrouter";
@@ -166,7 +167,10 @@ Return a JSON object: { "tracks": [{ "title": string, "artist": string, "release
         provider = r.value.provider;
         const d: any = r.value.data;
         const rows = Array.isArray(d?.tracks) ? d.tracks : Array.isArray(d) ? d : [];
-        collected.push(...rows);
+        collected.push(...rows.map((row: any) => ({
+          ...row,
+          __grounded: r.value.grounded === true,
+        })));
       }
       return anyOk;
     };
@@ -176,10 +180,8 @@ Return a JSON object: { "tracks": [{ "title": string, "artist": string, "release
         Array.from({ length: chunkCount }, (_, i) =>
           askOnce(
             perChunk,
-            `Batch ${i + 1} of ${chunkCount} — make this batch distinct from the others. At least ${Math.ceil(perChunk * 0.57)} items in this batch must be released on/after ${cutoffKey} (the last 9 months), mixing brand-new singles with strong tracks from albums released in that window. Do not pad with older catalogue songs.`,
-            // Ground the first batch on live web results so the queue reflects
-            // what actually came out recently.
-            i === 0,
+            `Batch ${i + 1} of ${chunkCount} — make this batch distinct. At least ${Math.ceil(perChunk * 0.75)} items must be verified releases on/after ${cutoffKey}. Prioritize the newest available months, then recent album tracks. Never substitute famous old songs.`,
+            true,
           ),
         ),
       );
@@ -197,22 +199,15 @@ Return a JSON object: { "tracks": [{ "title": string, "artist": string, "release
     }
 
     const seen = new Set<string>();
-    const currentYear = now.getFullYear();
-
     const normalize = (t: any) => {
       const releasedRaw = String(t?.released ?? "").trim();
-      const m = releasedRaw.match(/^(\d{4})[-/ ]?(\d{2})?/);
-      const relYear = m ? Number(m[1]) : Number(t?.year) || 0;
-      const relMonth = m && m[2] ? Number(m[2]) : 0;
+      const m = releasedRaw.match(/^(\d{4})-(\d{2})$/);
+      const relYear = m ? Number(m[1]) : 0;
+      const relMonth = m ? Number(m[2]) : 0;
       const year = Number(t?.year) || relYear;
-      // Verify recency from the actual date rather than trusting the label.
-      let fresh = false;
-      if (relYear) {
-        const key = `${relYear}-${String(relMonth || 12).padStart(2, "0")}`;
-        fresh = key >= cutoffKey;
-      } else {
-        fresh = String(t?.freshness ?? "").toLowerCase() === "current" && year >= currentYear;
-      }
+      const validMonth = relMonth >= 1 && relMonth <= 12;
+      const key = validMonth ? `${relYear}-${String(relMonth).padStart(2, "0")}` : "";
+      const fresh = t?.__grounded === true && key >= cutoffKey;
       return {
         title: String(t?.title ?? "").trim(),
         artist: String(t?.artist ?? "").trim(),
@@ -235,20 +230,22 @@ Return a JSON object: { "tracks": [{ "title": string, "artist": string, "release
 
     let cleaned = dedupe(collected.map(normalize));
 
-    // Top-up round: if the verified recent share is short, ask once more for
-    // last-9-months releases only, grounded on live web results.
+    // Top up to the latest-release target with two bounded live-search rounds.
     let freshRows = cleaned.filter((t) => t.freshness === "current");
-    if (freshRows.length < minRecent) {
-      const need = Math.min(count, minRecent - freshRows.length + 4);
+    for (let round = 1; round <= 2 && freshRows.length < targetRecent; round++) {
+      const need = Math.min(count, targetRecent - freshRows.length + 5);
       try {
         const topUp = await askOnce(
           need,
-          `TOP-UP ROUND: EVERY item must have been released on/after ${cutoffKey} (the last 9 months) — new singles and strong tracks from albums released in that window. No catalogue songs at all. Avoid these already chosen: ${cleaned.map((t) => `${t.title} — ${t.artist}`).slice(0, 60).join("; ")}`,
+          `LATEST-ONLY TOP-UP ${round}: EVERY item must be a real release on/after ${cutoffKey}. Search for the newest relevant rap/hip-hop singles and recent album tracks first. No catalog songs. Return exact YYYY-MM dates from live evidence. Avoid: ${cleaned.map((t) => `${t.title} — ${t.artist}`).slice(0, 60).join("; ")}`,
           true,
         );
         const d: any = topUp.data;
         const rows = Array.isArray(d?.tracks) ? d.tracks : Array.isArray(d) ? d : [];
-        cleaned = cleaned.concat(dedupe(rows.map(normalize).filter((t: any) => t.freshness === "current")));
+        const normalized = rows
+          .map((row: any) => normalize({ ...row, __grounded: topUp.grounded === true }))
+          .filter((t: any) => t.freshness === "current");
+        cleaned = cleaned.concat(dedupe(normalized));
       } catch (e) {
         console.error("[ai-recommend] top-up failed", String(e));
       }
@@ -258,10 +255,21 @@ Return a JSON object: { "tracks": [{ "title": string, "artist": string, "release
     // Pick a recency-weighted set, then weave fresh and catalog picks so new
     // music is spread through the queue instead of grouped at the top.
     const catalogRows = cleaned.filter((t) => t.freshness !== "current");
-    freshRows.sort((a, b) => (b.year || 0) - (a.year || 0));
-    const targetFresh = Math.min(freshRows.length, Math.max(minRecent, Math.ceil(count * 0.6)));
-    const pickFresh = freshRows.slice(0, targetFresh);
-    const pickCatalog = catalogRows.slice(0, Math.max(0, count - pickFresh.length));
+    freshRows.sort((a, b) => String(b.released).localeCompare(String(a.released)));
+    const takeDiverse = (rows: any[], limit: number, counts: Map<string, number>) => {
+      const picked: any[] = [];
+      for (const row of rows) {
+        if (picked.length >= limit) break;
+        const artist = row.artist.toLowerCase();
+        if ((counts.get(artist) ?? 0) >= 2) continue;
+        counts.set(artist, (counts.get(artist) ?? 0) + 1);
+        picked.push(row);
+      }
+      return picked;
+    };
+    const artistCounts = new Map<string, number>();
+    const pickFresh = takeDiverse(freshRows, Math.min(freshRows.length, targetRecent), artistCounts);
+    const pickCatalog = takeDiverse(catalogRows, Math.max(0, count - pickFresh.length), artistCounts);
     const total = pickFresh.length + pickCatalog.length;
 
     const woven: any[] = [];
@@ -290,6 +298,9 @@ Return a JSON object: { "tracks": [{ "title": string, "artist": string, "release
       provider,
       recentCount: woven.slice(0, count).filter((t) => t.freshness === "current").length,
       minRecent,
+      targetRecent,
+      freshnessVerified: true,
+      cutoff: cutoffKey,
     });
 
 
