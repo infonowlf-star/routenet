@@ -43,6 +43,7 @@ export interface ChatOptions {
 export interface ChatResult {
   text: string;
   provider: "lovable" | "gemini" | "openrouter";
+  grounded: boolean;
 }
 
 export class LlmUnavailableError extends Error {
@@ -199,18 +200,8 @@ async function callOpenRouter(o: ChatOptions): Promise<string | null> {
       if (/\b402\b|more credits|insufficient/i.test(msg)) {
         openRouterCooldownUntil = Date.now() + 10 * 60 * 1000;
       }
-      // Low-credit accounts reject the request but tell us the affordable
-      // budget — retry immediately within it instead of failing the feature.
-      // Web grounding costs extra credits and can time out — never let it kill
-      // the request; fall back to the plain call.
-      if (o.webSearch) {
-        try {
-          const text = await openRouterOnce({ ...o, webSearch: false }, model, timeoutMs);
-          if (text && text.trim()) return text;
-        } catch (e3) {
-          lastErr = e3;
-        }
-      }
+      // Never silently remove live grounding. A current-music request must not
+      // degrade into an ungrounded call that confidently returns stale songs.
       const afford = msg.match(/can only afford (\d+)/);
       if (afford) {
         const budget = Math.max(400, Number(afford[1]) - 50);
@@ -257,7 +248,11 @@ export async function chatComplete(o: ChatOptions): Promise<ChatResult> {
       const text = await fn(o);
       if (text && text.trim()) {
         if (name !== "lovable") console.log(`[llm] served by fallback provider: ${name}`);
-        return { text, provider: name };
+        return {
+          text,
+          provider: name,
+          grounded: name === "openrouter" && o.webSearch === true,
+        };
       }
       if (text === null) errors.push(`${name}: not configured`);
       else errors.push(`${name}: empty response`);
@@ -297,7 +292,12 @@ export function parseJsonLoose<T = Record<string, unknown>>(text: string): T | n
 /** Convenience: prompt -> parsed JSON object (or null when unparseable). */
 export async function chatJson<T = Record<string, unknown>>(
   o: ChatOptions,
-): Promise<{ data: T | null; provider: ChatResult["provider"]; raw: string }> {
+): Promise<{ data: T | null; provider: ChatResult["provider"]; grounded: boolean; raw: string }> {
   const res = await chatComplete(o);
-  return { data: parseJsonLoose<T>(res.text), provider: res.provider, raw: res.text };
+  return {
+    data: parseJsonLoose<T>(res.text),
+    provider: res.provider,
+    grounded: res.grounded,
+    raw: res.text,
+  };
 }
