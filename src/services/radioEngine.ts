@@ -22,6 +22,7 @@ import { toTitleCase } from "@/utils/toTitleCase";
 import { getLikedSongs, getRecentlyPlayed } from "@/services/fallbackRecommendation";
 import { isRecentlyRecommended, rememberRecommended } from "@/services/recommendedSongs";
 import { getUserPlaylists, getPlaylistTracks } from "@/services/playlistService";
+import { getRecommendations, type CatalogCandidate } from "@/services/catalogRecommend";
 
 
 
