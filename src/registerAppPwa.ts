@@ -1,6 +1,10 @@
 import { registerSW } from "virtual:pwa-register";
 
-const APP_SW_PATH = "/sw.js";
+const APP_SW_PATH = `${import.meta.env.BASE_URL || "/"}sw.js`;
+
+function isGithubPages() {
+  return window.location.hostname.endsWith(".github.io") || window.location.hostname === "github.io";
+}
 
 function isInIframe() {
   try {
@@ -42,6 +46,7 @@ export function registerAppPwa() {
 
   const shouldRefuseRegistration =
     !import.meta.env.PROD ||
+    isGithubPages() ||
     isInIframe() ||
     isPreviewHost(window.location.hostname) ||
     new URLSearchParams(window.location.search).get("sw") === "off";
