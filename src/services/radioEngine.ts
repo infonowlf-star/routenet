@@ -323,44 +323,32 @@ async function libraryContext(): Promise<LibraryContext> {
 
 const label = (t: Track) => `${t.title} — ${t.artist}`;
 
-async function askAI(
-  seed: Track | null,
-  exclude: string[],
-  count: number,
-  ctx: LibraryContext,
-): Promise<Suggestion[]> {
-  const { data, error } = await supabase.functions.invoke("ai-recommend", {
-    body: {
-      seed: seed ? { title: seed.title, artist: seed.artist } : null,
-      signals: tasteSignals(),
-      followedArtists: followedArtists(),
-      likedSongs: ctx.liked.slice(0, 30).map(label),
-      recentlyPlayed: ctx.recent.slice(0, 20).map(label),
-      playlistSongs: ctx.playlistTracks.slice(0, 25).map(label),
-      savedAlbums: ctx.albums,
-      // Artists heard very recently — the model should look beyond them.
-      recentArtists: artistHistory.slice(0, 15),
-      excludeTitles: exclude.slice(0, 120),
-      distribution: MIX,
-      // Rotates the model's starting point so runs don't converge.
-      variety: Math.random().toString(36).slice(2, 8),
-      count,
-    },
-  });
+/**
+ * Candidate generation — straight from the music catalog, no AI.
+ * Real release dates, real popularity, real artwork.
+ */
+async function getCandidates(seed: Track | null, count: number): Promise<Suggestion[]> {
+  const rows = await getRecommendations(
+    seed ? { title: seed.title, artist: seed.artist } : null,
+    count,
+  ).catch(() => [] as CatalogCandidate[]);
 
-  if (error) return [];
-  const rows = Array.isArray((data as any)?.tracks) ? (data as any).tracks : [];
-  return rows
-    .map((t: any) => ({
-      title: String(t?.title || "").trim(),
-      artist: String(t?.artist || "").trim(),
-      role: String(t?.role || "related").trim().toLowerCase(),
-      reason: String(t?.reason || "").trim(),
-      year: Number(t?.year) || undefined,
-      freshness: String(t?.freshness || "").trim().toLowerCase(),
-    }))
-    .filter((t: Suggestion) => t.title && t.artist);
-
+  return rows.map((c) => ({
+    title: c.title,
+    artist: c.artist,
+    role: c.role,
+    reason: c.reason,
+    year: c.year,
+    freshness: c.freshness,
+    track: {
+      id: c.deezerId ? `deezer-${c.deezerId}` : `cat-${songKey(c.title, c.artist)}`,
+      title: toTitleCase(c.title),
+      artist: toTitleCase(c.artist),
+      album: c.album,
+      artwork: c.artwork || "/placeholder.svg",
+      duration: c.duration,
+    } as Track,
+  }));
 }
 
 function bucketOf(role?: string): Bucket {
