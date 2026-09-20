@@ -117,12 +117,12 @@ export async function getRecommendations(
     seedQuery ? dz("searchTrack", { query: seedQuery, limit: 1 }) : null,
     seed ? dz("searchArtist", { name: seed.artist, limit: 1 }) : null,
     dz("getChart", { type: "tracks", limit: 40 }),
-    dz("getEditorialReleases", { limit: 40 }),
+    dz("getGenreChartAlbums", { genreId: 0, limit: 40 }),
   ]);
 
   const seedTrack = rows(seedSearch)[0];
   console.log("[rec] wave1", { seedTrack: seedTrack?.title, chart: rows(globalChart).length, editorial: rows(editorial).length });
-  const seedArtistId = rows(artistSearch)[0]?.id ?? seedTrack?.artist?.id;
+  const seedArtistId = seedTrack?.artist?.id ?? rows(artistSearch)[0]?.id;
 
   /* ---------- wave 2: radio, related artists, seed artist albums ---------- */
   const [radio, artistRadio, related, seedAlbums] = await Promise.all([
