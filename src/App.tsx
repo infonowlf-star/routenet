@@ -5,7 +5,7 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { configureNativeAudio } from "@/services/nativeAudioPlayer";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { HashRouter, Routes, Route } from "react-router-dom";
 import { PlayerProvider } from "@/context/PlayerContext";
 import { DJProvider } from "@/context/DJContext";
 import { DownloadModeProvider } from "@/context/DownloadModeContext";
@@ -126,7 +126,7 @@ const App = () => (
           <AppBootstrap>
             <Toaster />
             <Sonner />
-            <BrowserRouter>
+            <HashRouter>
               <Suspense fallback={<PageLoader />}>
                 <Routes>
                   <Route path="/" element={<Splash />} />
@@ -135,7 +135,7 @@ const App = () => (
                   <Route path="/*" element={<MainRoutes />} />
                 </Routes>
               </Suspense>
-            </BrowserRouter>
+            </HashRouter>
           </AppBootstrap>
           </DownloadModeProvider>
         </DJProvider>
