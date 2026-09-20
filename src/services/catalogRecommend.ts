@@ -124,8 +124,9 @@ export async function getRecommendations(
   const seedArtistId = rows(artistSearch)[0]?.id ?? seedTrack?.artist?.id;
 
   /* ---------- wave 2: radio, related artists, seed artist albums ---------- */
-  const [radio, related, seedAlbums] = await Promise.all([
+  const [radio, artistRadio, related, seedAlbums] = await Promise.all([
     seedTrack?.id ? dz("getTrackRadio", { trackId: seedTrack.id, limit: 30 }) : null,
+    seedArtistId ? dz("getArtistRadio", { artistId: seedArtistId, limit: 25 }) : null,
     seedArtistId ? dz("getArtistRelated", { artistId: seedArtistId, limit: 14 }) : null,
     seedArtistId ? dz("getArtistAlbums", { artistId: seedArtistId, limit: 12 }) : null,
   ]);
