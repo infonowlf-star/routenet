@@ -1,0 +1,1 @@
+function i(r){if(r==null)return"";if(typeof r=="string"){const e=Number(r);return!Number.isFinite(e)||e<=0?"":e.toLocaleString()}return typeof r!="number"||!Number.isFinite(r)||r<=0?"":r.toLocaleString()}export{i as f};

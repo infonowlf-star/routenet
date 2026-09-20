@@ -1,0 +1,303 @@
+/**
+ * Shared LLM helper with OpenRouter as the primary provider and optional
+ * legacy fallbacks for non-recommendation features.
+ *
+ * Every provider is tried in order until one returns text. This keeps the
+ * app's AI engine (recommendations, playlists, DJ, sections) working even when
+ * the Lovable gateway is rate-limited or out of credits.
+ */
+
+export interface ChatOptions {
+  system: string;
+  user: string;
+  /** Ask providers for a strict JSON object response. Default true. */
+  json?: boolean;
+  temperature?: number;
+  maxOutputTokens?: number;
+  /** Preferred Lovable-gateway model. */
+  gatewayModel?: string;
+  /** Preferred Gemini model (direct API). */
+  geminiModel?: string;
+  /** Preferred OpenRouter model. */
+  openRouterModel?: string;
+  /** Provider tried first; the others stay as fallbacks. */
+  prefer?: "lovable" | "gemini" | "openrouter";
+  /** Disable legacy providers for latency-sensitive features. */
+  openRouterOnly?: boolean;
+  /** Maximum time for each OpenRouter request. */
+  openRouterTimeoutMs?: number;
+  /** Skip the slower retry when a strict latency budget is required. */
+  openRouterSingleAttempt?: boolean;
+  /** Maximum time for the Lovable gateway request. */
+  gatewayTimeoutMs?: number;
+  /**
+   * Ground the completion on live web results (OpenRouter `web` plugin).
+   * Required for "what is out right now" questions: model weights have a
+   * knowledge cutoff and otherwise return stale catalogue music.
+   */
+  webSearch?: boolean;
+  /** How many web results to ground on (default 5). */
+  webSearchResults?: number;
+}
+
+export interface ChatResult {
+  text: string;
+  provider: "lovable" | "gemini" | "openrouter";
+  grounded: boolean;
+}
+
+export class LlmUnavailableError extends Error {
+  reason: string;
+  details: string[];
+  constructor(reason: string, details: string[]) {
+    super(`llm_unavailable: ${reason}`);
+    this.reason = reason;
+    this.details = details;
+  }
+}
+
+const DEFAULTS = {
+  gatewayModel: "google/gemini-3.6-flash",
+  geminiModel: "gemini-3.6-flash",
+  openRouterModel: "google/gemini-2.5-flash",
+  /** Lighter, faster route used for the retry attempt. */
+  openRouterFastModel: "google/gemini-2.5-flash-lite",
+};
+
+async function callLovable(o: ChatOptions): Promise<string | null> {
+  const key = Deno.env.get("LOVABLE_API_KEY");
+  if (!key) return null;
+  const r = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    method: "POST",
+    ...(o.gatewayTimeoutMs ? { signal: AbortSignal.timeout(o.gatewayTimeoutMs) } : {}),
+    headers: { "Content-Type": "application/json", "Lovable-API-Key": key },
+    body: JSON.stringify({
+      model: o.gatewayModel || DEFAULTS.gatewayModel,
+      messages: [
+        { role: "system", content: o.system },
+        { role: "user", content: o.user },
+      ],
+      ...(o.temperature != null ? { temperature: o.temperature } : {}),
+      ...(o.json === false ? {} : { response_format: { type: "json_object" } }),
+    }),
+  });
+  if (!r.ok) {
+    const body = await r.text();
+    throw new Error(`lovable ${r.status}: ${body.slice(0, 300)}`);
+  }
+  const data = await r.json();
+  return data?.choices?.[0]?.message?.content ?? null;
+}
+
+async function callGemini(o: ChatOptions): Promise<string | null> {
+  const key = Deno.env.get("GEMINI_API_KEY");
+  if (!key) return null;
+  const model = o.geminiModel || DEFAULTS.geminiModel;
+  const r = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-goog-api-key": key },
+      body: JSON.stringify({
+        systemInstruction: { parts: [{ text: o.system }] },
+        contents: [{ role: "user", parts: [{ text: o.user }] }],
+        generationConfig: {
+          ...(o.temperature != null ? { temperature: o.temperature } : {}),
+          ...(o.maxOutputTokens ? { maxOutputTokens: o.maxOutputTokens } : {}),
+          ...(o.json === false ? {} : { responseMimeType: "application/json" }),
+        },
+      }),
+    },
+  );
+  if (!r.ok) {
+    const body = await r.text();
+    throw new Error(`gemini ${r.status}: ${body.slice(0, 300)}`);
+  }
+  const data = await r.json();
+  const parts = data?.candidates?.[0]?.content?.parts;
+  if (!Array.isArray(parts)) return null;
+  const text = parts.map((p: { text?: string }) => p?.text ?? "").join("");
+  return text || null;
+}
+
+async function openRouterOnce(
+  o: ChatOptions,
+  model: string,
+  timeoutMs: number,
+  maxTokensOverride?: number,
+): Promise<string | null> {
+  const key = Deno.env.get("OPENROUTER_API_KEY");
+  if (!key) return null;
+  const r = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+    method: "POST",
+    signal: AbortSignal.timeout(timeoutMs),
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${key}`,
+      "HTTP-Referer": "https://routenet.lovable.app",
+      "X-Title": "RouteNet Music",
+    },
+    body: JSON.stringify({
+      model,
+      messages: [
+        { role: "system", content: o.system },
+        { role: "user", content: o.user },
+      ],
+      // Free / low-credit OpenRouter accounts cap the affordable token budget,
+      // so always send an explicit modest max_tokens instead of the model max.
+      max_tokens: maxTokensOverride ?? Math.min(o.maxOutputTokens ?? 8000, 8000),
+      ...(o.webSearch
+        ? {
+          plugins: [
+            {
+              id: "web",
+              max_results: o.webSearchResults ?? 5,
+              search_prompt:
+                "Use these live web results to know which songs, singles and albums were actually released in the last 9 months. Only trust release dates found here.",
+            },
+          ],
+        }
+        : {}),
+      ...(o.temperature != null ? { temperature: o.temperature } : {}),
+      ...(o.json === false ? {} : { response_format: { type: "json_object" } }),
+    }),
+  });
+  if (!r.ok) {
+    const body = await r.text();
+    throw new Error(`openrouter ${r.status}: ${body.slice(0, 300)}`);
+  }
+  const data = await r.json();
+  return data?.choices?.[0]?.message?.content ?? null;
+}
+
+/**
+ * OpenRouter is the primary provider. It gets a bounded timeout plus one retry
+ * on a lighter, faster model so a slow or hiccuping route never stalls the app.
+ */
+/** Set when OpenRouter reports no credits; skips it for a while so latency-
+ *  sensitive calls go straight to the working provider. */
+let openRouterCooldownUntil = 0;
+
+async function callOpenRouter(o: ChatOptions): Promise<string | null> {
+  if (Date.now() < openRouterCooldownUntil) return null;
+  const configuredModel = Deno.env.get("OPENROUTER_RECOMMENDATION_MODEL");
+  const primary = o.openRouterModel || configuredModel || DEFAULTS.openRouterModel;
+  const timeout = o.openRouterTimeoutMs ?? 25000;
+  const retryTimeout = o.openRouterTimeoutMs ?? 20000;
+  const attempts: Array<[string, number]> = o.openRouterSingleAttempt
+    ? [[primary, timeout]]
+    : [[primary, timeout], [DEFAULTS.openRouterFastModel, retryTimeout]];
+  let lastErr: unknown = null;
+  for (const [model, timeoutMs] of attempts) {
+    try {
+      const text = await openRouterOnce(o, model, timeoutMs);
+      if (text === null) return null; // not configured
+      if (text.trim()) return text;
+    } catch (e) {
+      lastErr = e;
+      const msg = e instanceof Error ? e.message : String(e);
+      console.error(`[llm] openrouter ${model} failed: ${msg}`);
+      if (/\b402\b|more credits|insufficient/i.test(msg)) {
+        openRouterCooldownUntil = Date.now() + 10 * 60 * 1000;
+      }
+      // Never silently remove live grounding. A current-music request must not
+      // degrade into an ungrounded call that confidently returns stale songs.
+      const afford = msg.match(/can only afford (\d+)/);
+      if (afford) {
+        const budget = Math.max(400, Number(afford[1]) - 50);
+        try {
+          const text = await openRouterOnce(o, model, timeoutMs, budget);
+          if (text && text.trim()) return text;
+        } catch (e2) {
+          lastErr = e2;
+          console.error(`[llm] openrouter ${model} budget retry failed`);
+        }
+      }
+    }
+  }
+  if (lastErr) throw lastErr instanceof Error ? lastErr : new Error(String(lastErr));
+  return null;
+}
+
+/**
+ * Runs the prompt through the provider chain and returns the first non-empty
+ * completion. Throws `LlmUnavailableError` when every provider failed.
+ */
+export async function chatComplete(o: ChatOptions): Promise<ChatResult> {
+  let providers: Array<[ChatResult["provider"], (x: ChatOptions) => Promise<string | null>]> = [
+    // OpenRouter is the primary engine; the others are pure fallbacks.
+    ["openrouter", callOpenRouter],
+    ["lovable", callLovable],
+    ["gemini", callGemini],
+  ];
+  if (o.prefer) {
+    providers = [
+      ...providers.filter(([n]) => n === o.prefer),
+      ...providers.filter(([n]) => n !== o.prefer),
+    ];
+  }
+  if (o.openRouterOnly) {
+    providers = providers.filter(([name]) => name === "openrouter");
+  }
+
+  const errors: string[] = [];
+  let sawQuota = false;
+
+  for (const [name, fn] of providers) {
+    try {
+      const text = await fn(o);
+      if (text && text.trim()) {
+        if (name !== "lovable") console.log(`[llm] served by fallback provider: ${name}`);
+        return {
+          text,
+          provider: name,
+          grounded: name === "openrouter" && o.webSearch === true,
+        };
+      }
+      if (text === null) errors.push(`${name}: not configured`);
+      else errors.push(`${name}: empty response`);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      if (/\b(402|429)\b|quota|rate limit|insufficient/i.test(msg)) sawQuota = true;
+      console.error(`[llm] ${msg}`);
+      errors.push(msg);
+    }
+  }
+
+  throw new LlmUnavailableError(sawQuota ? "quota_exhausted" : "all_providers_failed", errors);
+}
+
+/** Parses a JSON object out of a model completion, tolerating prose wrappers. */
+export function parseJsonLoose<T = Record<string, unknown>>(text: string): T | null {
+  try {
+    return JSON.parse(text) as T;
+  } catch { /* fall through */ }
+  const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/);
+  if (fenced) {
+    try { return JSON.parse(fenced[1]) as T; } catch { /* ignore */ }
+  }
+  const start = text.indexOf("{");
+  const end = text.lastIndexOf("}");
+  if (start !== -1 && end > start) {
+    try { return JSON.parse(text.slice(start, end + 1)) as T; } catch { /* ignore */ }
+  }
+  const as = text.indexOf("[");
+  const ae = text.lastIndexOf("]");
+  if (as !== -1 && ae > as) {
+    try { return JSON.parse(text.slice(as, ae + 1)) as T; } catch { /* ignore */ }
+  }
+  return null;
+}
+
+/** Convenience: prompt -> parsed JSON object (or null when unparseable). */
+export async function chatJson<T = Record<string, unknown>>(
+  o: ChatOptions,
+): Promise<{ data: T | null; provider: ChatResult["provider"]; grounded: boolean; raw: string }> {
+  const res = await chatComplete(o);
+  return {
+    data: parseJsonLoose<T>(res.text),
+    provider: res.provider,
+    grounded: res.grounded,
+    raw: res.text,
+  };
+}

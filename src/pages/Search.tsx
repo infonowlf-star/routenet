@@ -1,0 +1,791 @@
+import { useState, useEffect, useCallback, useMemo } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { Search as SearchIcon, Mic, MicOff, X, Loader2, Clock, User, Music, Disc, Radio, Play, MoreVertical, Plus, Download, ListPlus, ArrowLeft, Check } from "lucide-react";
+import { AddToPlaylistDialog } from "@/components/AddToPlaylistDialog";
+
+import { TrackCard } from "@/components/cards/TrackCard";
+import { ArtistCard } from "@/components/cards/ArtistCard";
+import { AlbumCard, Album } from "@/components/cards/AlbumCard";
+import { PodcastCard, Podcast } from "@/components/cards/PodcastCard";
+import { useDebouncedSearch, useSearchMusic, useYouTubeSearch, useUnifiedTrackSearch } from "@/hooks/useMusicSearch";
+import { useDeezerGenres } from "@/hooks/useDeezerGenres";
+import { Track, Artist } from "@/data/mockData";
+import { usePreloadYouTube } from "@/hooks/usePreloadYouTube";
+import { useNavigate } from "react-router-dom";
+import { usePlayer } from "@/context/PlayerContext";
+import { useQuery } from "@tanstack/react-query";
+import { getUserPlaylists } from "@/services/playlistService";
+import { getCombinedScore } from "@/lib/balancedPlaylist";
+import { supabase } from "@/integrations/supabase/client";
+import {
+  readSearchCache, writeSearchCache, isBlockedArtist, getBlockedArtists, blockArtist,
+  getRecentSearchItems, addRecentSearchItem, removeRecentSearchItem, clearRecentSearchItems,
+  type RecentSearchItem,
+} from "@/services/searchCache";
+
+const SEARCH_HISTORY_KEY = 'echotunes_search_history';
+const MAX_HISTORY = 10;
+function getSearchHistory(): string[] { try { return JSON.parse(localStorage.getItem(SEARCH_HISTORY_KEY) || '[]'); } catch { return []; } }
+function addToSearchHistory(query: string) { if (!query.trim()) return; const h = getSearchHistory().filter(h => h.toLowerCase() !== query.toLowerCase()); h.unshift(query.trim()); localStorage.setItem(SEARCH_HISTORY_KEY, JSON.stringify(h.slice(0, MAX_HISTORY))); }
+function removeFromSearchHistory(query: string) { localStorage.setItem(SEARCH_HISTORY_KEY, JSON.stringify(getSearchHistory().filter(h => h !== query))); }
+function clearSearchHistory() { localStorage.removeItem(SEARCH_HISTORY_KEY); }
+
+type FilterType = 'all' | 'tracks' | 'albums' | 'playlists' | 'mixes';
+const filterOptions: { type: FilterType; label: string; icon: React.ReactNode }[] = [
+  { type: 'all', label: 'All', icon: null },
+  { type: 'tracks', label: 'Songs', icon: <Music className="h-3 w-3" /> },
+  { type: 'albums', label: 'Albums', icon: <Disc className="h-3 w-3" /> },
+  { type: 'playlists', label: 'Playlists', icon: <Music className="h-3 w-3" /> },
+  { type: 'mixes', label: 'Mixes', icon: <Radio className="h-3 w-3" /> },
+];
+
+const isSpeechRecognitionSupported = () => 'webkitSpeechRecognition' in window || 'SpeechRecognition' in window;
+
+/** Read user onboarding artists/genres so search results can be biased toward taste. */
+function getUserTaste(): { artists: Set<string>; genres: Set<string> } {
+  try {
+    const raw = localStorage.getItem("onboarding");
+    if (raw) {
+      const o = JSON.parse(raw);
+      const artists = new Set<string>(((o.artists || []) as any[]).map((a) => (a.name || a).toString().toLowerCase()));
+      const genres = new Set<string>(((o.genres || []) as any[]).map((g) => (g.name || g).toString().toLowerCase()));
+      return { artists, genres };
+    }
+  } catch { /* ignore */ }
+  return { artists: new Set(), genres: new Set() };
+}
+
+// Prioritize: match query against title, artist, album - best match first
+function scoreMatch(query: string, item: { title?: string; name?: string; artist?: string; album?: string }): number {
+  const q = query.toLowerCase();
+  let score = 0;
+  const title = (item.title || item.name || "").toLowerCase();
+  const artist = (item.artist || "").toLowerCase();
+  const album = (item.album || "").toLowerCase();
+  if (title === q) score += 100;
+  else if (title.startsWith(q)) score += 80;
+  else if (title.includes(q)) score += 50;
+  if (artist === q) score += 90;
+  else if (artist.startsWith(q)) score += 70;
+  else if (artist.includes(q)) score += 40;
+  if (album.includes(q)) score += 30;
+  return score;
+}
+
+/**
+ * Final ranking: relevance dominates, then popularity/recency breaks ties,
+ * then a small personal-taste boost (matches user's onboarding artists/genres)
+ * surfaces results closer to the user's profile.
+ */
+function rankedScore(
+  query: string,
+  item: any,
+  taste: { artists: Set<string>; genres: Set<string> },
+): number {
+  let score = scoreMatch(query, item) + getCombinedScore(item) * 30;
+  const artist = (item.artist || item.name || "").toString().toLowerCase();
+  const album = (item.album || "").toString().toLowerCase();
+  if (artist && taste.artists.has(artist)) score += 20;
+  for (const g of taste.genres) {
+    if (g && (artist.includes(g) || album.includes(g))) { score += 8; break; }
+  }
+  return score;
+}
+
+/**
+ * Albums are ordered by fame rather than raw relevance: full-length records by
+ * artists that dominate the song results outrank obscure singles/compilations.
+ */
+function albumFameScore(album: any, famousArtists: Map<string, number>): number {
+  const tracks = Number(album.trackCount || album.nb_tracks || 0);
+  let score = 0;
+  if (tracks >= 10) score += 60;
+  else if (tracks >= 6) score += 40;
+  else if (tracks >= 3) score += 15;
+  const artistRank = famousArtists.get((album.artist || "").toLowerCase());
+  if (artistRank !== undefined) score += Math.max(0, 80 - artistRank * 6);
+  if (/(deluxe|remaster|edition)/i.test(album.title || "")) score += 8;
+  if (/(karaoke|tribute|cover|instrumental|made popular)/i.test(album.title || "")) score -= 120;
+  return score;
+}
+
+function formatDuration(seconds?: number) {
+  if (!seconds || seconds <= 0) return "";
+  const m = Math.floor(seconds / 60);
+  const s = Math.floor(seconds % 60);
+  return `${m}:${s.toString().padStart(2, "0")}`;
+}
+
+/** Three-dot actions for a search song card. */
+function SongActionsMenu({ track, open, onToggle, onClose, onAddToPlaylist }: {
+  track: Track;
+  open: boolean;
+  onToggle: () => void;
+  onClose: () => void;
+  onAddToPlaylist: () => void;
+}) {
+  const { addToQueue } = usePlayer();
+  return (
+    <div className="relative shrink-0" onClick={(e) => e.stopPropagation()}>
+      <button
+        aria-label="More options"
+        onClick={onToggle}
+        className="flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground hover:bg-white/10 hover:text-foreground"
+      >
+        <MoreVertical className="h-4 w-4" />
+      </button>
+      <AnimatePresence>
+        {open && (
+          <>
+            <div className="fixed inset-0 z-40" onClick={onClose} />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.92 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.92 }}
+              className="absolute right-0 top-9 z-50 min-w-44 overflow-hidden rounded-xl border border-border/30 bg-card shadow-xl"
+            >
+              <button onClick={onAddToPlaylist} className="flex w-full items-center gap-3 px-3 py-2.5 text-xs font-medium text-foreground hover:bg-muted/20">
+                <Plus className="h-3.5 w-3.5 text-muted-foreground" />Add to playlist
+              </button>
+              <button
+                onClick={async () => {
+                  onClose();
+                  const { toast } = await import("sonner");
+                  const id = toast.loading(`Downloading "${track.title}"…`);
+                  const { saveTrackToDevice } = await import("@/services/downloadService");
+                  const ok = await saveTrackToDevice(track, (p) => toast.loading(`Downloading "${track.title}" — ${p}%`, { id }));
+                  if (ok) toast.success("Saved to your device", { id });
+                  else toast.error("Download failed", { id });
+                }}
+                className="flex w-full items-center gap-3 px-3 py-2.5 text-xs font-medium text-foreground hover:bg-muted/20"
+              >
+                <Download className="h-3.5 w-3.5 text-muted-foreground" />Download
+              </button>
+              <button
+                onClick={async () => {
+                  onClose();
+                  addToQueue(track);
+                  const { toast } = await import("sonner");
+                  toast.success("Added to queue");
+                }}
+                className="flex w-full items-center gap-3 px-3 py-2.5 text-xs font-medium text-foreground hover:bg-muted/20"
+              >
+                <ListPlus className="h-3.5 w-3.5 text-muted-foreground" />Add to queue
+              </button>
+              <button
+                onClick={async () => {
+                  onClose();
+                  blockArtist(track.artist);
+                  const { toast } = await import("sonner");
+                  toast.success(`Hiding ${track.artist} from search`);
+                }}
+                className="flex w-full items-center gap-3 px-3 py-2.5 text-xs font-medium text-foreground hover:bg-muted/20"
+              >
+                <X className="h-3.5 w-3.5 text-muted-foreground" />Hide this artist
+              </button>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+/** Last query typed on this page — restored when the user navigates back. */
+const persistedSearch = { query: "" };
+
+export default function Search() {
+  const navigate = useNavigate();
+  const { playTrack } = usePlayer();
+  const { query, debouncedQuery, setQuery, clearQuery } = useDebouncedSearch(400, persistedSearch.query);
+  const [isFocused, setIsFocused] = useState(false);
+  const [searchHistory, setSearchHistory] = useState<string[]>([]);
+  const [activeFilter, setActiveFilter] = useState<FilterType>('all');
+  const [isListening, setIsListening] = useState(false);
+  const [speechSupported, setSpeechSupported] = useState(false);
+  const [recognition, setRecognition] = useState<any>(null);
+  const [menuTrackId, setMenuTrackId] = useState<string | null>(null);
+  const [playlistTrack, setPlaylistTrack] = useState<Track | null>(null);
+  const blocked = useMemo(() => getBlockedArtists(), []);
+  // Previous searches keep their results + metadata so history is instant.
+  const cached = useMemo(() => readSearchCache(debouncedQuery), [debouncedQuery]);
+
+
+  const { data: playlists } = useQuery({ queryKey: ["user-playlists"], queryFn: getUserPlaylists, staleTime: 30_000 });
+  const { data: genres } = useDeezerGenres();
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const urlQuery = params.get('q');
+    if (urlQuery && urlQuery !== query) { setQuery(urlQuery); window.history.replaceState({}, '', '/search'); }
+  }, []);
+
+  useEffect(() => {
+    setSearchHistory(getSearchHistory());
+    setSpeechSupported(isSpeechRecognitionSupported());
+    if (isSpeechRecognitionSupported()) {
+      const SR = (window as any).webkitSpeechRecognition || (window as any).SpeechRecognition;
+      const r = new SR(); r.continuous = false; r.interimResults = true; r.lang = 'en-US';
+      r.onresult = (e: any) => { const t = Array.from(e.results).map((r: any) => r[0].transcript).join(''); setQuery(t); };
+      r.onend = () => setIsListening(false);
+      r.onerror = () => setIsListening(false);
+      setRecognition(r);
+    }
+  }, []);
+
+  const toggleVoiceSearch = useCallback(() => {
+    if (!recognition) return;
+    if (isListening) { recognition.stop(); setIsListening(false); } else { recognition.start(); setIsListening(true); }
+  }, [recognition, isListening]);
+
+  const { data: searchResults, isLoading, error } = useSearchMusic(debouncedQuery);
+  const { data: youtubeResults, isLoading: loadingYouTube } = useYouTubeSearch(debouncedQuery);
+  // Piped (playback) + Deezer (metadata) pipeline — primary song results.
+  const { data: unifiedTracks, isLoading: loadingUnified } = useUnifiedTrackSearch(debouncedQuery);
+  const taste = useMemo(() => getUserTaste(), []);
+
+  useEffect(() => {
+    if (debouncedQuery.length >= 2 && searchResults) { addToSearchHistory(debouncedQuery); setSearchHistory(getSearchHistory()); }
+  }, [debouncedQuery, searchResults]);
+
+  const hasQuery = query.length > 0;
+  // Keep the query alive across navigation so "back" restores the same results.
+  useEffect(() => { persistedSearch.query = query; }, [query]);
+  const hasApiResults = searchResults && (searchResults.artists.length > 0 || searchResults.tracks.length > 0 || searchResults.albums.length > 0);
+
+  // Songs come from Piped only (always playable). Deezer stays behind the
+  // scenes as the metadata layer — its own rows are never listed.
+  const liveTracks: Track[] = ((unifiedTracks || []) as Track[])
+    .filter((t) => !isBlockedArtist(t.artist, blocked))
+    .slice()
+    .sort((a, b) => rankedScore(debouncedQuery, b, taste) - rankedScore(debouncedQuery, a, taste));
+  const filteredTracks: Track[] = liveTracks.length ? liveTracks : (cached?.tracks || []);
+
+
+  const liveArtists: Artist[] = hasApiResults
+    ? searchResults.artists.map((a): Artist => ({ id: a.id, name: a.name, avatar: a.avatar || '', monthlyListeners: a.monthlyListeners || 0 }))
+        .filter((a) => !isBlockedArtist(a.name, blocked))
+        .sort((a, b) => rankedScore(debouncedQuery, { name: b.name, nb_fan: (b as any).monthlyListeners }, taste) - rankedScore(debouncedQuery, { name: a.name, nb_fan: (a as any).monthlyListeners }, taste))
+    : [];
+  const filteredArtists: Artist[] = liveArtists.length ? liveArtists : (cached?.artists || []);
+
+  // Fame map: artists that own the top song results, most popular first.
+  const famousArtists = useMemo(() => {
+    const m = new Map<string, number>();
+    liveTracks.forEach((t) => {
+      const k = (t.artist || "").toLowerCase();
+      if (k && !m.has(k)) m.set(k, m.size);
+    });
+    return m;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [liveTracks.length, debouncedQuery]);
+
+  const liveAlbums: Album[] = hasApiResults
+    ? searchResults.albums.map((a) => ({ id: a.id, title: a.name, artist: a.artist, artwork: a.artwork || '', trackCount: a.trackCount || 0 }))
+        .filter((a) => !isBlockedArtist(a.artist, blocked))
+        .sort((a, b) => albumFameScore(b, famousArtists) - albumFameScore(a, famousArtists))
+    : [];
+  const filteredAlbums: Album[] = liveAlbums.length ? liveAlbums : (cached?.albums || []);
+
+  // Persist finished searches (results + metadata) for the history cache.
+  useEffect(() => {
+    if (debouncedQuery.length < 2) return;
+    if (!liveTracks.length && !liveArtists.length && !liveAlbums.length) return;
+    writeSearchCache(debouncedQuery, { tracks: liveTracks, artists: liveArtists, albums: liveAlbums });
+    const top = liveTracks[0];
+    addRecentSearchItem({
+      id: debouncedQuery.toLowerCase(), kind: "query", title: debouncedQuery,
+      subtitle: top ? `Song • ${top.artist}` : "Search",
+      artwork: top?.artwork, query: debouncedQuery,
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [debouncedQuery, liveTracks.length, liveArtists.length, liveAlbums.length]);
+
+
+  // Also search playlists
+  const matchingPlaylists = (playlists || []).filter(p => p.name.toLowerCase().includes(debouncedQuery.toLowerCase()));
+
+  const podcasts: Podcast[] = youtubeResults?.slice(0, 6).map((v) => ({ id: v.id, title: v.title, author: v.channelTitle, image: v.thumbnail, description: v.title })) || [];
+
+  usePreloadYouTube(filteredTracks.slice(0, 10), filteredTracks.length > 0);
+
+  const showTracks = activeFilter === 'all' || activeFilter === 'tracks';
+  const showAlbums = activeFilter === 'all' || activeFilter === 'albums';
+  const showPlaylists = activeFilter === 'all' || activeFilter === 'playlists';
+  const showMixes = activeFilter === 'mixes';
+
+  // Find the top result across all types (songs, artists, albums, playlists),
+  // with duplicates removed: one row per artist, one row per title+artist song.
+  const normKey = (s: string) => (s || "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+
+  const seenTrackKeys = new Set<string>();
+  const dedupedTracks = filteredTracks.filter((t) => {
+    const k = `${normKey(t.title)}::${normKey(t.artist)}`;
+    if (!k.trim() || seenTrackKeys.has(k)) return false;
+    seenTrackKeys.add(k);
+    return true;
+  });
+
+  const seenArtistKeys = new Set<string>();
+  const dedupedArtists = filteredArtists.filter((a) => {
+    const k = normKey(a.name);
+    if (!k || seenArtistKeys.has(k)) return false;
+    seenArtistKeys.add(k);
+    return true;
+  });
+
+  // Albums: collapse re-issues / editions of the same record by the same artist
+  // so a query never returns the same album five times.
+  const albumBaseKey = (title: string) =>
+    normKey(
+      (title || "")
+        .replace(/\((?:[^)]*)\)|\[[^\]]*\]/g, " ")
+        .replace(/\b(deluxe|expanded|remaster(?:ed)?|edition|version|anniversary|reissue|bonus|explicit|clean|live|instrumental)\b.*$/i, " "),
+    );
+  const seenAlbumKeys = new Set<string>();
+  const dedupedAlbums = filteredAlbums.filter((a) => {
+    const k = `${albumBaseKey(a.title)}::${normKey(a.artist)}`;
+    if (!k.replace("::", "").trim() || seenAlbumKeys.has(k)) return false;
+    seenAlbumKeys.add(k);
+    return true;
+  });
+
+  // Hierarchy: songs first, then playlists, then albums. Albums are the least
+  // useful result type here, so they rank last and are capped.
+  const TYPE_RANK = { track: 3, playlist: 2, album: 1 } as const;
+
+  const topItems = [
+    ...dedupedTracks.map(t => ({ type: 'track' as const, score: scoreMatch(debouncedQuery, t), item: t })),
+    ...dedupedAlbums
+      .slice(0, 6)
+      .map(a => ({ type: 'album' as const, score: scoreMatch(debouncedQuery, { title: a.title, artist: a.artist }), item: a })),
+    // Playlists are ranked on their own score: name match plus size, so the
+    // fullest, most relevant playlists surface above thin ones.
+    ...matchingPlaylists.map(p => ({
+      type: 'playlist' as const,
+      score: scoreMatch(debouncedQuery, { title: p.name }) + Math.min(30, Number((p as any).track_count ?? 0) * 2),
+      item: p,
+    })),
+  ].sort((a, b) =>
+    TYPE_RANK[b.type] - TYPE_RANK[a.type] || b.score - a.score,
+  );
+
+  const topResult = topItems[0];
+
+  // One flat result list — no per-type sections, just filtered by the pills.
+  // In the "All" tab only a few albums are shown so they never flood the list.
+  let albumsShown = 0;
+  const visibleItems = topItems.filter((e) => {
+    if (activeFilter === 'tracks') return e.type === 'track';
+    if (activeFilter === 'albums') return e.type === 'album';
+    if (activeFilter === 'playlists') return e.type === 'playlist';
+    if (activeFilter !== 'all') return false;
+    if (e.type === 'album') {
+      albumsShown += 1;
+      return albumsShown <= 3;
+    }
+    return true;
+  });
+
+
+
+  return (
+    <div className="custom-scrollbar min-h-screen overflow-y-auto pb-4">
+      <motion.header
+        initial={{ opacity: 0, y: -20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="sticky top-0 z-30 bg-muted/25 backdrop-blur-xl px-3 pt-3 pb-3"
+      >
+        <div className="flex items-center gap-3">
+          <button
+            aria-label="Go back"
+            onClick={() => navigate(-1)}
+            className="shrink-0 p-1 text-foreground"
+          >
+            <ArrowLeft className="h-6 w-6" />
+          </button>
+          <div className="relative flex-1">
+            <input
+              type="text"
+              autoFocus={!persistedSearch.query}
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              onFocus={() => setIsFocused(true)}
+              onBlur={() => setIsFocused(false)}
+              placeholder={isListening ? "Listening..." : "What do you want to listen to?"}
+              className="w-full bg-transparent py-1 pr-14 text-[17px] font-normal text-foreground placeholder:text-muted-foreground/80 focus:outline-none"
+            />
+            <div className="absolute right-1 top-1/2 flex -translate-y-1/2 items-center gap-1">
+              {isLoading || loadingYouTube || loadingUnified ? (
+                <Loader2 className="h-4 w-4 animate-spin text-primary" />
+              ) : hasQuery ? (
+                <button onClick={clearQuery} className="p-1 text-muted-foreground hover:text-foreground"><X className="h-5 w-5" /></button>
+              ) : speechSupported ? (
+                <button aria-label="Voice search" onClick={toggleVoiceSearch} className="p-1 text-muted-foreground hover:text-foreground">
+                  {isListening ? <MicOff className="h-5 w-5 text-primary" /> : <Mic className="h-5 w-5" />}
+                </button>
+              ) : null}
+            </div>
+          </div>
+        </div>
+
+
+        <AnimatePresence>
+          {isListening && (
+            <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="mt-2 flex items-center gap-2 text-primary">
+              <div className="flex gap-0.5">{[0,1,2,3,4].map((i) => <motion.div key={i} className="h-4 w-1 rounded-full bg-primary" animate={{ scaleY: [0.3, 1, 0.3] }} transition={{ duration: 0.5, repeat: Infinity, delay: i * 0.1 }} />)}</div>
+              <span className="text-sm">Listening... speak now</span>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {hasQuery && (
+        <motion.div initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} className="mt-3 flex gap-1.5 overflow-x-auto pb-1 scrollbar-hide">
+          {filterOptions.map((filter) => (
+            <button key={filter.type} onClick={() => setActiveFilter(filter.type)}
+              className={`flex items-center gap-1 whitespace-nowrap rounded-full border px-3 py-1 text-[11px] font-semibold transition-colors ${
+                activeFilter === filter.type
+                  ? 'border-primary/50 bg-primary/15 text-primary'
+                  : 'border-white/12 bg-transparent text-white/75 hover:bg-white/5'
+              }`}>{filter.icon}{filter.label}</button>
+          ))}
+        </motion.div>
+        )}
+
+      </motion.header>
+
+      <div className="px-4 pt-4">
+      {hasQuery ? (
+        <div className="space-y-3">
+
+
+          {/* Unified top results list — sorted by relevance, unlimited scroll */}
+
+          {(loadingUnified || isLoading) && topItems.length === 0 && activeFilter !== 'mixes' && (
+            <ResultSkeletons count={10} />
+          )}
+
+          {activeFilter !== 'mixes' && visibleItems.length > 0 && (
+            <section>
+              <div>
+                {visibleItems.map((entry, i) => {
+                  if (entry.type === 'track') {
+                    const t = entry.item as Track;
+                    return (
+                      <motion.div key={`tr-${t.id}`} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: Math.min(i * 0.03, 0.3) }}
+                        className="group flex cursor-pointer items-center gap-3 py-2 transition-colors"
+                        onClick={() => {
+                          addRecentSearchItem({
+                            id: String(t.id), kind: "track", title: t.title,
+                            subtitle: `Song • ${t.artist}`, artwork: t.artwork,
+                            explicit: !!(t as any).explicit, query: t.title,
+                          });
+                          playTrack(t, filteredTracks);
+                        }}>
+                        <div className="relative h-[52px] w-[52px] shrink-0 overflow-hidden rounded-[3px] bg-muted/30">
+                          <img src={t.artwork} alt="" loading="lazy" className="h-full w-full object-cover" />
+                          <div className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 transition-opacity group-hover:opacity-100">
+                            <Play className="h-5 w-5 text-white" fill="currentColor" />
+                          </div>
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-[16px] font-normal leading-tight text-foreground">{t.title}</p>
+                          <div className="mt-1 flex items-center gap-1.5">
+                            {(t as any).explicit && (
+                              <span className="rounded-[2px] bg-muted-foreground/70 px-[3px] text-[9px] font-bold leading-[13px] text-background">E</span>
+                            )}
+                            <p className="truncate text-[13px] text-muted-foreground">
+                              Song • {t.artist}
+                            </p>
+                          </div>
+                        </div>
+                        <SongActionsMenu
+                          track={t}
+                          open={menuTrackId === t.id}
+                          onToggle={() => setMenuTrackId(menuTrackId === t.id ? null : t.id)}
+                          onClose={() => setMenuTrackId(null)}
+                          onAddToPlaylist={() => { setMenuTrackId(null); setPlaylistTrack(t); }}
+                        />
+                      </motion.div>
+                    );
+
+                  }
+
+                  if (entry.type === 'album') {
+                    const al = entry.item as Album;
+                    return (
+                      <motion.div key={`al-${al.id}`} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: Math.min(i * 0.03, 0.3) }}
+                        className="flex cursor-pointer items-center gap-3 py-2"
+                        onClick={() => {
+                          addRecentSearchItem({ id: String(al.id), kind: "album", title: al.title, subtitle: `Album • ${al.artist}`, artwork: al.artwork, query: al.title });
+                          navigate(`/album/${al.id.toString().replace("deezer-", "")}`);
+                        }}>
+                        <img src={al.artwork} alt="" loading="lazy" className="h-[52px] w-[52px] shrink-0 rounded-[3px] bg-muted/30 object-cover" />
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-[16px] font-normal leading-tight text-foreground">{al.title}</p>
+                          <p className="mt-1 truncate text-[13px] text-muted-foreground">Album • {al.artist}</p>
+                        </div>
+                      </motion.div>
+                    );
+                  }
+
+                  if (entry.type === 'playlist') {
+                    const p = entry.item as any;
+                    return (
+                      <motion.div key={`pl-${p.id}`} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: Math.min(i * 0.03, 0.3) }}
+                        className="flex cursor-pointer items-center gap-3 py-2"
+                        onClick={() => {
+                          addRecentSearchItem({ id: String(p.id), kind: "playlist", title: p.name, subtitle: "Playlist", artwork: p.cover_image || undefined, query: p.name });
+                          navigate(`/user-playlist/${p.id}`);
+                        }}>
+                        <div className="h-[52px] w-[52px] shrink-0 overflow-hidden rounded-[3px] bg-muted/30">
+                          {p.cover_image ? <img src={p.cover_image} alt="" className="h-full w-full object-cover" /> : <div className="flex h-full w-full items-center justify-center"><Music className="h-5 w-5 text-muted-foreground" /></div>}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-[16px] font-normal leading-tight text-foreground">{p.name}</p>
+                          <p className="mt-1 truncate text-[13px] text-muted-foreground">Playlist</p>
+                        </div>
+                      </motion.div>
+                    );
+                  }
+                  return null;
+                })}
+              </div>
+            </section>
+          )}
+
+          {(activeFilter === 'all' || activeFilter === 'playlists') && (
+            <DeezerPlaylistResults query={debouncedQuery} />
+          )}
+
+          {showMixes && (
+            <MixesResults query={debouncedQuery} />
+          )}
+          {topItems.length === 0 && podcasts.length === 0 && !loadingUnified && !isLoading && (
+            <div className="py-12 text-center"><p className="text-muted-foreground">No results found for "{query}"</p></div>
+          )}
+        </div>
+      ) : (
+        <RecentSearches setQuery={setQuery} />
+      )}
+      </div>
+      <AddToPlaylistDialog
+        isOpen={!!playlistTrack}
+        onClose={() => setPlaylistTrack(null)}
+        track={{
+          title: playlistTrack?.title || "",
+          artist: playlistTrack?.artist || "",
+          album: playlistTrack?.album,
+          artwork: playlistTrack?.artwork,
+          duration: playlistTrack?.duration,
+          preview: playlistTrack?.preview,
+        }}
+      />
+    </div>
+
+  );
+}
+
+/** Placeholder rows shown while search results stream in. */
+function ResultSkeletons({ count = 8 }: { count?: number }) {
+  return (
+    <div>
+      {Array.from({ length: count }).map((_, i) => (
+        <div key={i} className="flex items-center gap-3 py-2">
+          <div className="h-[52px] w-[52px] shrink-0 animate-pulse rounded-[3px] bg-muted/30" />
+          <div className="min-w-0 flex-1 space-y-2">
+            <div className="h-3.5 w-2/3 animate-pulse rounded bg-muted/30" />
+            <div className="h-3 w-1/3 animate-pulse rounded bg-muted/20" />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/** Deezer playlists matching the query, with a one-tap save to the library. */
+function DeezerPlaylistResults({ query }: { query: string }) {
+  const navigate = useNavigate();
+  const [saving, setSaving] = useState<string | null>(null);
+  const [saved, setSaved] = useState<Record<string, boolean>>({});
+  const { data, isLoading } = useQuery({
+    queryKey: ["search-deezer-playlists", query],
+    queryFn: async () => {
+      const { searchPlaylists, transformPlaylist } = await import("@/services/deezer");
+      const raw = await searchPlaylists(query, 12);
+      return (raw || []).map(transformPlaylist);
+    },
+    enabled: !!query && query.length >= 2,
+    staleTime: 30 * 60 * 1000,
+  });
+
+  const savePlaylist = async (p: any) => {
+    setSaving(String(p.id));
+    try {
+      const { getPlaylistTracks, transformTrack } = await import("@/services/deezer");
+      const { createPlaylist, addTracksToPlaylist } = await import("@/services/playlistService");
+      const raw = await getPlaylistTracks(p.id, 100);
+      const tracks = (raw || []).map(transformTrack).map((t: any) => ({
+        title: t.title, artist: t.artist, album: t.album,
+        artwork: t.artwork, duration: t.duration, preview: t.preview,
+      }));
+      const created = await createPlaylist(p.title, `Saved from ${p.creator || "Deezer"}`, false);
+      if (created) {
+        if (tracks.length) await addTracksToPlaylist(created.id, tracks);
+        setSaved((prev) => ({ ...prev, [p.id]: true }));
+      }
+    } catch { /* ignore */ } finally {
+      setSaving(null);
+    }
+  };
+
+  if (isLoading) return <ResultSkeletons count={4} />;
+  if (!data?.length) return null;
+
+  return (
+    <div>
+      {data.map((p: any) => (
+        <div key={p.id} className="flex w-full items-center gap-3 py-2">
+          <button onClick={() => navigate(`/playlist/${p.id}`)} className="flex min-w-0 flex-1 items-center gap-3 text-left">
+            <img src={p.cover} alt="" loading="lazy" className="h-[52px] w-[52px] shrink-0 rounded-[3px] bg-muted/30 object-cover" />
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-[16px] font-normal leading-tight text-foreground">{p.title}</p>
+              <p className="mt-1 truncate text-[13px] text-muted-foreground">Playlist • {p.creator}</p>
+            </div>
+          </button>
+          <button
+            aria-label={saved[p.id] ? "Saved to library" : "Save to library"}
+            disabled={!!saving || saved[p.id]}
+            onClick={() => savePlaylist(p)}
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-white/10 hover:text-foreground disabled:opacity-60"
+          >
+            {saving === String(p.id) ? <Loader2 className="h-4 w-4 animate-spin" />
+              : saved[p.id] ? <Check className="h-5 w-5 text-primary" />
+              : <Plus className="h-5 w-5" />}
+          </button>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/** Mixes tab — YouTube long mixes from the youtube edge function. */
+
+
+function MixesResults({ query }: { query: string }) {
+
+  const { playVideo } = usePlayer();
+  const { data, isLoading } = useQuery({
+    queryKey: ["search-mixes", query],
+    queryFn: async () => {
+      const q = `${query} mix`;
+      const { data } = await supabase.functions.invoke("youtube", {
+        body: { action: "search", params: { query: q, maxResults: 20 } },
+      });
+      const items: any[] = data?.items || data?.results || data?.videos || (Array.isArray(data) ? data : []);
+      return items.filter((v) => (v.duration || 0) >= 15 * 60 || /mix|hour/i.test(v.title || ""));
+    },
+    enabled: !!query && query.length >= 2,
+    staleTime: 10 * 60 * 1000,
+  });
+
+  if (!query) return null;
+  if (isLoading) return <p className="text-sm text-muted-foreground py-6 text-center">Finding mixes…</p>;
+  if (!data || data.length === 0) return <p className="text-sm text-muted-foreground py-6 text-center">No mixes found.</p>;
+
+  return (
+    <section>
+      <h2 className="mb-2 text-[20px] font-extrabold tracking-tight text-foreground">Mixes</h2>
+      <div>
+        {data.map((v: any) => (
+          <button key={v.id} onClick={() => playVideo({
+            id: `yt-mix-${v.id}`, title: v.title, artist: v.channelTitle || "YouTube",
+            youtubeId: v.id, thumbnail: v.thumbnail || "", duration: v.duration || 0,
+          })} className="flex w-full items-center gap-3 py-2 text-left">
+            <img src={v.thumbnail} alt="" className="h-[52px] w-[92px] shrink-0 rounded-[3px] bg-muted/30 object-cover" />
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-[16px] font-normal leading-tight text-foreground">{v.title}</p>
+              <p className="mt-1 truncate text-[13px] text-muted-foreground">Mix • {v.channelTitle || "YouTube"}</p>
+            </div>
+          </button>
+        ))}
+      </div>
+    </section>
+  );
+}
+/* --------------------------------------------------------------- */
+/* Recent searches — rich rows with artwork, type + artist, remove  */
+/* --------------------------------------------------------------- */
+function RecentSearches({ setQuery }: { setQuery: (q: string) => void }) {
+  const navigate = useNavigate();
+  const [items, setItems] = useState<RecentSearchItem[]>([]);
+
+  useEffect(() => { setItems(getRecentSearchItems()); }, []);
+
+  const open = (item: RecentSearchItem) => {
+    if (item.kind === "artist") return navigate(`/artist/${encodeURIComponent(item.title)}`);
+    if (item.kind === "album") return navigate(`/album/${item.id.replace("deezer-", "")}`);
+    if (item.kind === "playlist") return navigate(`/user-playlist/${item.id}`);
+    setQuery(item.query || item.title);
+  };
+
+  if (items.length === 0) {
+    return (
+      <div className="pt-16 text-center">
+        <p className="text-sm font-medium text-muted-foreground">Search across songs, artists, albums, playlists and mixes.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="pt-2">
+      <div className="mb-3 flex items-center justify-between">
+        <h2 className="text-[22px] font-extrabold tracking-tight text-foreground">Recent searches</h2>
+        <button
+          onClick={() => { clearRecentSearchItems(); setItems([]); }}
+          className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground hover:text-foreground"
+        >
+          Clear
+        </button>
+      </div>
+
+      <div>
+        {items.map((item, i) => (
+          <motion.div
+            key={`${item.kind}-${item.id}`}
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: Math.min(i * 0.03, 0.3) }}
+            className="flex items-center gap-3 py-2"
+          >
+            <button onClick={() => open(item)} className="flex min-w-0 flex-1 items-center gap-3 text-left">
+              <div className={`h-[52px] w-[52px] shrink-0 overflow-hidden bg-muted/30 ${item.kind === "artist" ? "rounded-full" : "rounded-[3px]"}`}>
+                {item.artwork ? (
+                  <img src={item.artwork} alt="" loading="lazy" className="h-full w-full object-cover" />
+                ) : (
+                  <div className="flex h-full w-full items-center justify-center"><Music className="h-5 w-5 text-muted-foreground" /></div>
+                )}
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-[16px] font-normal leading-tight text-foreground">{item.title}</p>
+                <div className="mt-1 flex items-center gap-1.5">
+                  {item.explicit && (
+                    <span className="rounded-[2px] bg-muted-foreground/70 px-[3px] text-[9px] font-bold leading-[13px] text-background">E</span>
+                  )}
+                  <p className="truncate text-[13px] text-muted-foreground">{item.subtitle}</p>
+                </div>
+              </div>
+            </button>
+            <button
+              aria-label={`Remove ${item.title}`}
+              onClick={() => { removeRecentSearchItem(item.id, item.kind); setItems(getRecentSearchItems()); }}
+              className="shrink-0 p-2 text-muted-foreground hover:text-foreground"
+            >
+              <X className="h-5 w-5" />
+            </button>
+          </motion.div>
+        ))}
+      </div>
+    </div>
+  );
+}
