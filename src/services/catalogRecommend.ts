@@ -121,6 +121,7 @@ export async function getRecommendations(
   ]);
 
   const seedTrack = rows(seedSearch)[0];
+  console.log("[rec] wave1", { seedTrack: seedTrack?.title, chart: rows(globalChart).length, editorial: rows(editorial).length });
   const seedArtistId = rows(artistSearch)[0]?.id ?? seedTrack?.artist?.id;
 
   /* ---------- wave 2: radio, related artists, seed artist albums ---------- */
@@ -132,6 +133,7 @@ export async function getRecommendations(
   ]);
 
   const relatedArtists = rows(related).slice(0, 10);
+  console.log("[rec] wave2", { radio: rows(radio).length, artistRadio: rows(artistRadio).length, related: relatedArtists.length, seedAlbums: rows(seedAlbums).length });
 
   /* ---------- wave 3: per-artist albums + top tracks ---------- */
   const perArtist = await Promise.all(
@@ -152,6 +154,7 @@ export async function getRecommendations(
     ...freshAlbums(rows(editorial), 10),
   ].slice(0, 22);
 
+  console.log("[rec] newAlbums", newAlbums.length);
   const albumTracks = await Promise.all(
     newAlbums.map(async (al) => ({ album: al, tracks: rows(await dz("getAlbumTracks", { albumId: al.id, limit: 12 })) })),
   );
