@@ -5,7 +5,7 @@ import { componentTagger } from "lovable-tagger";
 import { VitePWA } from "vite-plugin-pwa";
 
 export default defineConfig(({ mode }) => ({
-  base: "/routenet/",
+  base: "./",
   server: {
     host: "::",
     port: 8080,
@@ -118,14 +118,14 @@ export default defineConfig(({ mode }) => ({
         background_color: "#0f1012",
         display: "standalone",
         orientation: "portrait",
-        scope: "/routenet/",
-        start_url: "/routenet/",
+        scope: "./",
+        start_url: "./",
         categories: ["music", "entertainment"],
         icons: [
-          { src: "/routenet/favicon.png", sizes: "64x64", type: "image/png" },
-          { src: "/routenet/pwa-192.png", sizes: "192x192", type: "image/png" },
-          { src: "/routenet/pwa-512.png", sizes: "512x512", type: "image/png" },
-          { src: "/routenet/pwa-512.png", sizes: "512x512", type: "image/png", purpose: "maskable" },
+          { src: "./favicon.png", sizes: "64x64", type: "image/png" },
+          { src: "./pwa-192.png", sizes: "192x192", type: "image/png" },
+          { src: "./pwa-512.png", sizes: "512x512", type: "image/png" },
+          { src: "./pwa-512.png", sizes: "512x512", type: "image/png", purpose: "maskable" },
         ],
       },
     }),
