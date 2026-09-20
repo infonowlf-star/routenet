@@ -31,9 +31,19 @@ async function unregisterAppServiceWorkers() {
   if (!("serviceWorker" in navigator)) return;
   try {
     const registrations = await navigator.serviceWorker.getRegistrations();
+    const safeScopes = new Set([
+      `${window.location.origin}/`,
+      `${window.location.origin}${import.meta.env.BASE_URL || "/"}`,
+    ]);
+
     await Promise.all(
       registrations
-        .filter((registration) => registration.active?.scriptURL.endsWith(APP_SW_PATH) || registration.scope === `${window.location.origin}/`)
+        .filter((registration) => {
+          const scriptUrl = registration.active?.scriptURL || registration.installing?.scriptURL || "";
+          const matchesSw = scriptUrl.includes("/sw.js") || scriptUrl.includes("workbox");
+          const matchesScope = safeScopes.has(registration.scope) || registration.scope.endsWith(`${import.meta.env.BASE_URL || "/"}`);
+          return matchesSw || matchesScope;
+        })
         .map((registration) => registration.unregister()),
     );
   } catch {
