@@ -575,7 +575,7 @@ async function buildBatch(seed: Track | null, existing: Track[], limit: number):
   // Thin result: relax ONLY the 7-day recommended block and the queue memory.
   // The 6-hour play cooldown always stays enforced.
   if (pool.length < Math.min(limit, 8)) {
-    const relaxed = prepare(ai, new Set<string>(), false);
+    const relaxed = prepare(suggestions, new Set<string>(), false);
     const seen = new Set(pool.map((p) => p.key));
     pool = [...pool, ...relaxed.filter((p) => !seen.has(p.key))];
   }
