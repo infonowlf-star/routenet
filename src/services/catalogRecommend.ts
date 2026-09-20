@@ -176,7 +176,8 @@ export async function getRecommendations(
   }
 
   // Songs that sit right next to the seed.
-  for (const t of rows(radio)) push(toCandidate(t, "related", { reason: "Close to the song you picked" }));
+  for (const t of [...rows(radio), ...rows(artistRadio)])
+    push(toCandidate(t, "related", { reason: "Close to the song you picked" }));
 
   // Current charts.
   for (const t of rows(globalChart)) push(toCandidate(t, "trending", { reason: "Charting right now" }));
