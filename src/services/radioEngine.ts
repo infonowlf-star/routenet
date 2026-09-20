@@ -567,13 +567,9 @@ async function decorate(tracks: Track[]): Promise<Track[]> {
 async function buildBatch(seed: Track | null, existing: Track[], limit: number): Promise<Track[]> {
   const excludeKeys = new Set<string>(existing.map((t) => songKey(t.title, t.artist)));
   if (seed) excludeKeys.add(songKey(seed.title, seed.artist));
-  const excludeTitles = existing.slice(-24).map((t) => `${t.title} — ${t.artist}`);
+  const suggestions = await getCandidates(seed, limit).catch(() => [] as Suggestion[]);
 
-  const ctx = await libraryContext();
-  const aiCount = Math.min(60, Math.max(35, Math.ceil(limit * 0.7)));
-  const ai = await askAI(seed, excludeTitles, aiCount, ctx).catch(() => [] as Suggestion[]);
-
-  let pool = prepare(ai, excludeKeys);
+  let pool = prepare(suggestions, excludeKeys);
 
   // Thin result: relax ONLY the 7-day recommended block and the queue memory.
   // The 6-hour play cooldown always stays enforced.
