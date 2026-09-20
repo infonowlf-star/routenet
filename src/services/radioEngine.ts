@@ -22,6 +22,7 @@ import { toTitleCase } from "@/utils/toTitleCase";
 import { getLikedSongs, getRecentlyPlayed } from "@/services/fallbackRecommendation";
 import { isRecentlyRecommended, rememberRecommended } from "@/services/recommendedSongs";
 import { getUserPlaylists, getPlaylistTracks } from "@/services/playlistService";
+import { getRecommendations, type CatalogCandidate } from "@/services/catalogRecommend";
 
 
 
@@ -323,44 +324,32 @@ async function libraryContext(): Promise<LibraryContext> {
 
 const label = (t: Track) => `${t.title} — ${t.artist}`;
 
-async function askAI(
-  seed: Track | null,
-  exclude: string[],
-  count: number,
-  ctx: LibraryContext,
-): Promise<Suggestion[]> {
-  const { data, error } = await supabase.functions.invoke("ai-recommend", {
-    body: {
-      seed: seed ? { title: seed.title, artist: seed.artist } : null,
-      signals: tasteSignals(),
-      followedArtists: followedArtists(),
-      likedSongs: ctx.liked.slice(0, 30).map(label),
-      recentlyPlayed: ctx.recent.slice(0, 20).map(label),
-      playlistSongs: ctx.playlistTracks.slice(0, 25).map(label),
-      savedAlbums: ctx.albums,
-      // Artists heard very recently — the model should look beyond them.
-      recentArtists: artistHistory.slice(0, 15),
-      excludeTitles: exclude.slice(0, 120),
-      distribution: MIX,
-      // Rotates the model's starting point so runs don't converge.
-      variety: Math.random().toString(36).slice(2, 8),
-      count,
-    },
-  });
+/**
+ * Candidate generation — straight from the music catalog, no AI.
+ * Real release dates, real popularity, real artwork.
+ */
+async function getCandidates(seed: Track | null, count: number): Promise<Suggestion[]> {
+  const rows = await getRecommendations(
+    seed ? { title: seed.title, artist: seed.artist } : null,
+    count,
+  ).catch(() => [] as CatalogCandidate[]);
 
-  if (error) return [];
-  const rows = Array.isArray((data as any)?.tracks) ? (data as any).tracks : [];
-  return rows
-    .map((t: any) => ({
-      title: String(t?.title || "").trim(),
-      artist: String(t?.artist || "").trim(),
-      role: String(t?.role || "related").trim().toLowerCase(),
-      reason: String(t?.reason || "").trim(),
-      year: Number(t?.year) || undefined,
-      freshness: String(t?.freshness || "").trim().toLowerCase(),
-    }))
-    .filter((t: Suggestion) => t.title && t.artist);
-
+  return rows.map((c) => ({
+    title: c.title,
+    artist: c.artist,
+    role: c.role,
+    reason: c.reason,
+    year: c.year,
+    freshness: c.freshness,
+    track: {
+      id: c.deezerId ? `deezer-${c.deezerId}` : `cat-${songKey(c.title, c.artist)}`,
+      title: toTitleCase(c.title),
+      artist: toTitleCase(c.artist),
+      album: c.album,
+      artwork: c.artwork || "/placeholder.svg",
+      duration: c.duration,
+    } as Track,
+  }));
 }
 
 function bucketOf(role?: string): Bucket {
@@ -579,18 +568,14 @@ async function decorate(tracks: Track[]): Promise<Track[]> {
 async function buildBatch(seed: Track | null, existing: Track[], limit: number): Promise<Track[]> {
   const excludeKeys = new Set<string>(existing.map((t) => songKey(t.title, t.artist)));
   if (seed) excludeKeys.add(songKey(seed.title, seed.artist));
-  const excludeTitles = existing.slice(-24).map((t) => `${t.title} — ${t.artist}`);
+  const suggestions = await getCandidates(seed, limit).catch(() => [] as Suggestion[]);
 
-  const ctx = await libraryContext();
-  const aiCount = Math.min(60, Math.max(35, Math.ceil(limit * 0.7)));
-  const ai = await askAI(seed, excludeTitles, aiCount, ctx).catch(() => [] as Suggestion[]);
-
-  let pool = prepare(ai, excludeKeys);
+  let pool = prepare(suggestions, excludeKeys);
 
   // Thin result: relax ONLY the 7-day recommended block and the queue memory.
   // The 6-hour play cooldown always stays enforced.
   if (pool.length < Math.min(limit, 8)) {
-    const relaxed = prepare(ai, new Set<string>(), false);
+    const relaxed = prepare(suggestions, new Set<string>(), false);
     const seen = new Set(pool.map((p) => p.key));
     pool = [...pool, ...relaxed.filter((p) => !seen.has(p.key))];
   }
