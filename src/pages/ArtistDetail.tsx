@@ -204,18 +204,29 @@ const ArtistDetail = () => {
   const bannerImage = (artist as any)?.banner || artist?.avatar;
 
   const ReleaseRow = ({ title, items, delay }: { title: string; items: Release[]; delay: number }) => (
-    <motion.section initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay }} className="mb-8 px-4">
-      <h2 className="mb-4 text-xl font-bold">{title}</h2>
-      <div className="-mx-4 flex gap-4 overflow-x-auto px-4 pb-4 scrollbar-hide">
-        {items.map((r) => (
-          <motion.div key={r.id} whileTap={{ scale: 0.98 }} onClick={() => navigate(`/album/${r.id}`)} className="w-40 flex-shrink-0 cursor-pointer">
-            <img src={r.artwork} alt={r.name} className="h-40 w-40 rounded-md object-cover" onError={(e) => { (e.target as HTMLImageElement).src = PLACEHOLDER_ART; }} />
-            <h3 className="mt-2 truncate font-semibold">{toTitleCase(r.name)}</h3>
-            <p className="text-sm text-muted-foreground">{[r.year, toTitleCase(r.type)].filter(Boolean).join(" · ")}</p>
-          </motion.div>
-        ))}
+    <section className="mb-8 px-4" style={{ animationDelay: `${delay}s` }}>
+      <div className="mb-4 flex items-center justify-between">
+        <h2 className="text-xl font-bold text-foreground">{title}</h2>
+        <span className="text-[10px] uppercase tracking-[0.22em] text-muted-foreground">{items[0]?.type || "release"}</span>
       </div>
-    </motion.section>
+      <div className="-mx-4 flex gap-3 overflow-x-auto px-4 pb-3">
+        {items.map((r) => {
+          const compact = r.type === "ep" || r.type === "single";
+          return (
+            <div key={r.id} onClick={() => navigate(`/album/${r.id}`)} className={`shrink-0 cursor-pointer ${compact ? "w-28" : "w-36"}`}>
+              <img
+                src={r.artwork}
+                alt={r.name}
+                className={`${compact ? "h-28 w-28" : "h-36 w-36"} rounded-xl object-cover shadow-[0_12px_24px_rgba(0,0,0,0.18)]`}
+                onError={(e) => { (e.target as HTMLImageElement).src = PLACEHOLDER_ART; }}
+              />
+              <h3 className="mt-2 truncate text-sm font-semibold text-foreground">{toTitleCase(r.name)}</h3>
+              <p className="truncate text-[11px] text-muted-foreground">{[r.year, toTitleCase(r.type)].filter(Boolean).join(" • ")}</p>
+            </div>
+          );
+        })}
+      </div>
+    </section>
   );
 
   return (
@@ -223,15 +234,10 @@ const ArtistDetail = () => {
       <div className="relative overflow-hidden">
         <div className="relative h-64 overflow-hidden">
           <div className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: `url(${bannerImage})` }} />
-          <div className="absolute inset-0 bg-gradient-to-b from-background/20 via-background/40 to-background" />
-          <motion.button
-            initial={{ opacity: 0, x: -16 }}
-            animate={{ opacity: 1, x: 0 }}
-            onClick={() => navigate(-1)}
-            className="absolute left-4 top-4 z-10 flex h-9 w-9 items-center justify-center rounded-full bg-black/40 text-white backdrop-blur-sm transition hover:bg-black/60"
-          >
+          <div className="absolute inset-0 bg-gradient-to-b from-black/20 via-black/30 to-background" />
+          <button onClick={() => navigate(-1)} className="absolute left-4 top-4 z-10 flex h-9 w-9 items-center justify-center rounded-full bg-black/40 text-white backdrop-blur-sm transition hover:bg-black/60">
             <ArrowLeft className="h-4 w-4" />
-          </motion.button>
+          </button>
           {isLoading && (
             <div className="absolute right-4 top-4 z-10 flex items-center gap-2 rounded-full bg-black/40 px-3 py-1 text-[10px] font-medium text-white backdrop-blur-sm">
               <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
@@ -241,64 +247,51 @@ const ArtistDetail = () => {
         </div>
 
         <div className="relative z-10 -mt-12 px-4">
-          <div className="rounded-[28px] border border-white/10 bg-background/80 p-4 shadow-[0_20px_50px_rgba(0,0,0,0.2)] backdrop-blur-sm">
-            <div className="flex items-end gap-4">
-              <img
-                src={artist?.avatar || PLACEHOLDER_ART}
-                alt={artist?.name}
-                className="h-20 w-20 rounded-full border-4 border-background object-cover shadow-lg"
-                onError={(e) => { (e.target as HTMLImageElement).src = PLACEHOLDER_ART; }}
-              />
-              <div className="min-w-0 flex-1">
-                <div className="mb-2 flex items-center gap-2">
-                  <span className="rounded-full bg-primary/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-primary">Verified</span>
-                  {(artist as any)?.genre && (
-                    <span className="rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
-                      {toTitleCase((artist as any).genre)}
-                    </span>
-                  )}
-                </div>
-                <h1 className="truncate text-2xl font-black tracking-tight text-foreground">{toTitleCase(artist?.name || artistName)}</h1>
-                <p className="mt-1 text-sm text-muted-foreground">{artist?.stageName || artist?.realName || "Artist"}</p>
+          <div className="flex items-end gap-3">
+            <img
+              src={artist?.avatar || PLACEHOLDER_ART}
+              alt={artist?.name}
+              className="h-24 w-24 rounded-full border-4 border-background object-cover shadow-[0_18px_36px_rgba(0,0,0,0.35)]"
+              onError={(e) => { (e.target as HTMLImageElement).src = PLACEHOLDER_ART; }}
+            />
+            <div className="min-w-0 flex-1 pb-2">
+              <div className="mb-2 flex items-center gap-2">
+                <span className="rounded-full border border-white/10 bg-background/60 px-2 py-0.5 text-[10px] uppercase tracking-[0.18em] text-muted-foreground">Artist</span>
+                {(artist as any)?.genre && (
+                  <span className="rounded-full border border-white/10 bg-background/60 px-2 py-0.5 text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
+                    {toTitleCase((artist as any).genre)}
+                  </span>
+                )}
               </div>
+              <h1 className="truncate text-3xl font-black tracking-tight text-foreground">{toTitleCase(artist?.name || artistName)}</h1>
+              <p className="mt-1 text-sm text-muted-foreground">{formatExactNumber(artist?.monthlyListeners || 0)} monthly listeners</p>
             </div>
+          </div>
 
-            <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
-              <div className="rounded-2xl border border-white/10 bg-card/60 p-3">
-                <p className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">Monthly listeners</p>
-                <p className="mt-2 text-lg font-bold text-foreground">{formatExactNumber(artist?.monthlyListeners || 0)}</p>
-              </div>
-              <div className="rounded-2xl border border-white/10 bg-card/60 p-3">
-                <p className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">Origin</p>
-                <p className="mt-2 text-lg font-bold text-foreground">{(artist as any)?.origin || "Worldwide"}</p>
-              </div>
-            </div>
-
-            <div className="mt-4 flex items-center gap-3">
-              <Button onClick={handlePlayAll} size="lg" disabled={allTracks.length === 0} className="h-12 rounded-full bg-primary px-5 text-sm font-semibold text-black shadow-[0_12px_30px_rgba(29,185,84,0.28)] hover:bg-primary/90">
-                <Play className="mr-2 h-4 w-4 fill-current" />
-                Play
-              </Button>
-              <Button onClick={handleShuffle} variant="ghost" size="icon" className="h-11 w-11 rounded-full bg-white/5 hover:bg-white/10">
-                <Shuffle className="h-4 w-4 text-primary" />
-              </Button>
-              <Button onClick={handleLike} variant={isFollowing ? "secondary" : "outline"} className="h-11 rounded-full border-white/10 bg-white/5 px-4 text-sm font-semibold">
-                <Heart className={`mr-2 h-4 w-4 ${isFollowing ? "fill-primary text-primary" : ""}`} />
-                {isFollowing ? "Liked" : "Follow"}
-              </Button>
-            </div>
+          <div className="mt-4 flex items-center gap-3">
+            <Button onClick={handlePlayAll} size="lg" disabled={allTracks.length === 0} className="h-12 rounded-full bg-primary px-5 text-sm font-semibold text-black shadow-[0_12px_30px_rgba(29,185,84,0.28)] hover:bg-primary/90">
+              <Play className="mr-2 h-4 w-4 fill-current" />
+              Play
+            </Button>
+            <Button onClick={handleShuffle} variant="ghost" size="icon" className="h-11 w-11 rounded-full bg-white/5 hover:bg-white/10">
+              <Shuffle className="h-4 w-4 text-primary" />
+            </Button>
+            <Button onClick={handleLike} variant={isFollowing ? "secondary" : "outline"} className="h-11 rounded-full border-white/10 bg-white/5 px-4 text-sm font-semibold">
+              <Heart className={`mr-2 h-4 w-4 ${isFollowing ? "fill-primary text-primary" : ""}`} />
+              {isFollowing ? "Liked" : "Follow"}
+            </Button>
           </div>
         </div>
       </div>
 
       <div className="px-4 pb-6">
-        <motion.section initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="mt-6 rounded-[26px] border border-white/10 bg-card/50 p-4">
+        <section className="mt-6 rounded-2xl border border-white/10 bg-background/60 p-4">
           <div className="mb-3 flex items-center justify-between">
             <h2 className="text-xl font-bold text-foreground">About</h2>
             <span className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground">Story</span>
           </div>
           <p className="text-sm leading-7 text-foreground/85">{artist?.bio || "Artist information not available."}</p>
-        </motion.section>
+        </section>
 
         <motion.section initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }} className="mt-6">
           <div className="mb-3 flex items-center justify-between">
@@ -346,7 +339,7 @@ const ArtistDetail = () => {
         )}
 
         {suggestedArtists.length > 0 && (
-          <motion.section initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25 }} className="mt-8">
+          <section className="mt-8">
             <div className="mb-3 flex items-center justify-between">
               <h2 className="text-xl font-bold text-foreground">Fans also like</h2>
               <span className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground">Curated</span>
@@ -356,7 +349,7 @@ const ArtistDetail = () => {
                 <button
                   key={suggested.id}
                   onClick={() => navigate(`/artist/${encodeURIComponent(suggested.name)}`)}
-                  className="group w-28 shrink-0 rounded-[22px] border border-white/10 bg-card/60 p-2 text-left transition hover:border-primary/40"
+                  className="group w-28 shrink-0 rounded-[22px] border border-white/10 bg-background/60 p-2 text-left transition hover:border-primary/30"
                 >
                   <div className="mb-2 overflow-hidden rounded-[16px] bg-muted/30">
                     <img src={suggested.avatar} alt={suggested.name} className="h-24 w-full object-cover transition duration-200 group-hover:scale-105" />
@@ -366,29 +359,8 @@ const ArtistDetail = () => {
                 </button>
               ))}
             </div>
-          </motion.section>
+          </section>
         )}
-
-        <motion.section initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.27 }} className="mt-8 rounded-[24px] border border-white/10 bg-card/50 p-4">
-          <div className="mb-3 flex items-center justify-between">
-            <h2 className="text-xl font-bold text-foreground">Artist details</h2>
-            <span className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground">Profile</span>
-          </div>
-          <div className="grid grid-cols-3 gap-3">
-            <div className="rounded-2xl border border-white/10 bg-background/80 p-3">
-              <p className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">Real name</p>
-              <p className="mt-2 text-sm font-semibold text-foreground">{(artist as any)?.realName || artist?.name || "Unknown"}</p>
-            </div>
-            <div className="rounded-2xl border border-white/10 bg-background/80 p-3">
-              <p className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">Age</p>
-              <p className="mt-2 text-sm font-semibold text-foreground">{(artist as any)?.age || "—"}</p>
-            </div>
-            <div className="rounded-2xl border border-white/10 bg-background/80 p-3">
-              <p className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">Stage name</p>
-              <p className="mt-2 text-sm font-semibold text-foreground">{artist?.stageName || artist?.name || artistName}</p>
-            </div>
-          </div>
-        </motion.section>
 
         {similarArtists.length > 0 && (
           <motion.section initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }} className="mt-8">

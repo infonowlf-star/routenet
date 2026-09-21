@@ -28,7 +28,6 @@ export function AlbumCard({ album, index = 0, size = "md" }: AlbumCardProps) {
     lg: "w-44 min-w-[11rem]",
   };
 
-  // Extract numeric ID from "deezer-123" format
   const albumId = typeof album.id === 'string' && album.id.startsWith('deezer-') 
     ? album.id.replace('deezer-', '') 
     : album.id;
@@ -39,14 +38,14 @@ export function AlbumCard({ album, index = 0, size = "md" }: AlbumCardProps) {
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 20 }}
+      initial={{ opacity: 0, y: 18 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: index * 0.05 }}
+      transition={{ delay: index * 0.04 }}
       onClick={handleClick}
       className={`group cursor-pointer ${sizeClasses[size]}`}
     >
-      <div className="relative mb-3 overflow-hidden rounded-[22px] border border-white/10 bg-card/60 p-1 shadow-[0_18px_42px_rgba(0,0,0,0.22)]">
-        <div className="relative aspect-square overflow-hidden rounded-[18px]">
+      <div className="relative mb-3 overflow-hidden rounded-[18px] border border-white/10 bg-background/40 p-1 shadow-[0_12px_30px_rgba(0,0,0,0.18)]">
+        <div className="relative aspect-square overflow-hidden rounded-[14px]">
           {album.artwork ? (
             <img
               src={album.artwork}
@@ -60,16 +59,9 @@ export function AlbumCard({ album, index = 0, size = "md" }: AlbumCardProps) {
             </div>
           )}
           <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent" />
-          <div className="absolute left-2 top-2 rounded-full border border-white/15 bg-black/25 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-white/80 backdrop-blur-sm">
-            Album
-          </div>
-          <motion.button
-            initial={{ scale: 0, opacity: 0 }}
-            whileHover={{ scale: 1.05 }}
-            className="absolute bottom-2 right-2 flex h-10 w-10 items-center justify-center rounded-full bg-primary text-primary-foreground opacity-0 shadow-[0_12px_24px_rgba(0,0,0,0.35)] transition-opacity duration-300 group-hover:opacity-100"
-          >
-            <Play className="h-5 w-5 fill-current" />
-          </motion.button>
+          <button className="absolute bottom-2 right-2 flex h-8 w-8 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-[0_12px_24px_rgba(0,0,0,0.35)] opacity-0 transition-all duration-200 group-hover:opacity-100">
+            <Play className="ml-0.5 h-4 w-4 fill-current" />
+          </button>
         </div>
       </div>
       <h3 className="truncate text-sm font-semibold text-foreground">{album.title}</h3>
