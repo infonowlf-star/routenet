@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowDownCircle, ChevronDown, Heart, Loader2, ListMusic, MessageSquareQuote, MoreHorizontal, Pause, Play, Plus, Repeat, Repeat1, Share2, Shuffle, SkipBack, SkipForward, Volume1, Volume2 } from "lucide-react";
+import { ArrowDownCircle, ChevronDown, Heart, Loader2, ListMusic, MessageSquareQuote, MoreHorizontal, Pause, Play, Plus, Repeat, Repeat1, Share2, Shuffle, SkipBack, SkipForward, Volume2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { AddToPlaylistDialog } from "@/components/AddToPlaylistDialog";
@@ -39,6 +39,7 @@ export default function NowPlaying() {
   const [downloadStatus, setDownloadStatus] = useState<"idle" | "downloading" | "done" | "failed">("idle");
   const [downloadPercent, setDownloadPercent] = useState(0);
   const [showVideo, setShowVideo] = useState(false);
+  const [showVolume, setShowVolume] = useState(false);
   const [volume, setVolume] = useState(() => getGlobalVolume());
   /** Deezer metadata for the current song (title / artist / album / hi-res art). */
   const [meta, setMeta] = useState<DeezerMeta | null>(null);
@@ -242,19 +243,21 @@ export default function NowPlaying() {
           </button>
         </div>
 
-        {/* Volume row */}
-        <div className="mt-8 flex items-center gap-3">
-          <Volume1 className="h-4 w-4 shrink-0 text-foreground/45" />
-          <Slider
-            value={[volume * 100]}
-            max={100}
-            step={1}
-            aria-label="Volume"
-            onValueChange={([value]) => { setVolume(value / 100); setGlobalVolume(value / 100); }}
-            className="flex-1 [&_[role=slider]]:h-2.5 [&_[role=slider]]:w-2.5 [&_[role=slider]]:border-0 [&>span]:h-[4px]"
-          />
-          <Volume2 className="h-4 w-4 shrink-0 text-foreground/45" />
-        </div>
+        {showVolume && (
+          <div className="mt-6 rounded-2xl border border-white/10 bg-black/20 p-3 backdrop-blur-sm">
+            <div className="flex items-center gap-3">
+              <Volume2 className="h-4 w-4 shrink-0 text-foreground/60" />
+              <Slider
+                value={[volume * 100]}
+                max={100}
+                step={1}
+                aria-label="Volume"
+                onValueChange={([value]) => { setVolume(value / 100); setGlobalVolume(value / 100); }}
+                className="flex-1 [&_[role=slider]]:h-2.5 [&_[role=slider]]:w-2.5 [&_[role=slider]]:border-0 [&>span]:h-[4px]"
+              />
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Bottom icon bar */}
@@ -268,6 +271,9 @@ export default function NowPlaying() {
           </button>
           <button onClick={toggleRepeat} aria-label={`Repeat: ${repeat}`} className={cn("text-foreground/70 transition-colors hover:text-foreground", repeat !== "off" && "text-primary")}>
             {repeat === "one" ? <Repeat1 className="h-[21px] w-[21px]" /> : <Repeat className="h-[21px] w-[21px]" />}
+          </button>
+          <button onClick={() => setShowVolume((prev) => !prev)} aria-label="Volume" className={cn("text-foreground/70 transition-colors hover:text-foreground", showVolume && "text-primary")}>
+            <Volume2 className="h-[21px] w-[21px]" />
           </button>
           <button onClick={() => navigate("/queue")} aria-label="Queue" className="text-foreground/70 transition-colors hover:text-foreground">
             <ListMusic className="h-[22px] w-[22px]" />
