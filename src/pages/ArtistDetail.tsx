@@ -251,14 +251,14 @@ const ArtistDetail = () => {
             <img
               src={artist?.avatar || PLACEHOLDER_ART}
               alt={artist?.name}
-              className="h-24 w-24 rounded-full border-4 border-background object-cover shadow-[0_18px_36px_rgba(0,0,0,0.35)]"
+              className="h-24 w-24 rounded-full object-cover shadow-[0_18px_36px_rgba(0,0,0,0.35)]"
               onError={(e) => { (e.target as HTMLImageElement).src = PLACEHOLDER_ART; }}
             />
             <div className="min-w-0 flex-1 pb-2">
               <div className="mb-2 flex items-center gap-2">
-                <span className="rounded-full border border-white/10 bg-background/60 px-2 py-0.5 text-[10px] uppercase tracking-[0.18em] text-muted-foreground">Artist</span>
+                <span className="rounded-full bg-background/60 px-2 py-0.5 text-[10px] uppercase tracking-[0.18em] text-muted-foreground">Artist</span>
                 {(artist as any)?.genre && (
-                  <span className="rounded-full border border-white/10 bg-background/60 px-2 py-0.5 text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
+                  <span className="rounded-full bg-background/60 px-2 py-0.5 text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
                     {toTitleCase((artist as any).genre)}
                   </span>
                 )}
@@ -276,7 +276,7 @@ const ArtistDetail = () => {
             <Button onClick={handleShuffle} variant="ghost" size="icon" className="h-11 w-11 rounded-full bg-white/5 hover:bg-white/10">
               <Shuffle className="h-4 w-4 text-primary" />
             </Button>
-            <Button onClick={handleLike} variant={isFollowing ? "secondary" : "outline"} className="h-11 rounded-full border-white/10 bg-white/5 px-4 text-sm font-semibold">
+            <Button onClick={handleLike} variant={isFollowing ? "secondary" : "outline"} className="h-11 rounded-full bg-white/5 px-4 text-sm font-semibold hover:bg-white/10">
               <Heart className={`mr-2 h-4 w-4 ${isFollowing ? "fill-primary text-primary" : ""}`} />
               {isFollowing ? "Liked" : "Follow"}
             </Button>
@@ -285,14 +285,6 @@ const ArtistDetail = () => {
       </div>
 
       <div className="px-4 pb-6">
-        <section className="mt-6 rounded-2xl border border-white/10 bg-background/60 p-4">
-          <div className="mb-3 flex items-center justify-between">
-            <h2 className="text-xl font-bold text-foreground">About</h2>
-            <span className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground">Story</span>
-          </div>
-          <p className="text-sm leading-7 text-foreground/85">{artist?.bio || "Artist information not available."}</p>
-        </section>
-
         <motion.section initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }} className="mt-6">
           <div className="mb-3 flex items-center justify-between">
             <h2 className="text-xl font-bold text-foreground">Popular</h2>
@@ -349,7 +341,7 @@ const ArtistDetail = () => {
                 <button
                   key={suggested.id}
                   onClick={() => navigate(`/artist/${encodeURIComponent(suggested.name)}`)}
-                  className="group w-28 shrink-0 rounded-[22px] border border-white/10 bg-background/60 p-2 text-left transition hover:border-primary/30"
+                  className="group w-28 shrink-0 rounded-[22px] bg-background/60 p-2 text-left transition hover:bg-background/80"
                 >
                   <div className="mb-2 overflow-hidden rounded-[16px] bg-muted/30">
                     <img src={suggested.avatar} alt={suggested.name} className="h-24 w-full object-cover transition duration-200 group-hover:scale-105" />
