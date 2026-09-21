@@ -45,8 +45,8 @@ export function AlbumCard({ album, index = 0, size = "md" }: AlbumCardProps) {
       onClick={handleClick}
       className={`group cursor-pointer ${sizeClasses[size]}`}
     >
-      <div className="relative mb-2 overflow-hidden rounded-xl shadow-lg">
-        <div className="aspect-square">
+      <div className="relative mb-3 overflow-hidden rounded-[22px] border border-white/10 bg-card/60 p-1 shadow-[0_18px_42px_rgba(0,0,0,0.22)]">
+        <div className="relative aspect-square overflow-hidden rounded-[18px]">
           {album.artwork ? (
             <img
               src={album.artwork}
@@ -59,24 +59,23 @@ export function AlbumCard({ album, index = 0, size = "md" }: AlbumCardProps) {
               <Disc className="h-10 w-10 text-primary" />
             </div>
           )}
+          <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent" />
+          <div className="absolute left-2 top-2 rounded-full border border-white/15 bg-black/25 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-white/80 backdrop-blur-sm">
+            Album
+          </div>
+          <motion.button
+            initial={{ scale: 0, opacity: 0 }}
+            whileHover={{ scale: 1.05 }}
+            className="absolute bottom-2 right-2 flex h-10 w-10 items-center justify-center rounded-full bg-primary text-primary-foreground opacity-0 shadow-[0_12px_24px_rgba(0,0,0,0.35)] transition-opacity duration-300 group-hover:opacity-100"
+          >
+            <Play className="h-5 w-5 fill-current" />
+          </motion.button>
         </div>
-        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
-        <motion.button
-          initial={{ scale: 0, opacity: 0 }}
-          whileHover={{ scale: 1.1 }}
-          className="absolute bottom-2 right-2 flex h-10 w-10 items-center justify-center rounded-full bg-primary text-primary-foreground opacity-0 shadow-lg transition-opacity duration-300 group-hover:opacity-100"
-        >
-          <Play className="h-5 w-5 fill-current" />
-        </motion.button>
       </div>
-      <h3 className="truncate text-sm font-semibold text-foreground">
-        {album.title}
-      </h3>
+      <h3 className="truncate text-sm font-semibold text-foreground">{album.title}</h3>
       <p className="truncate text-xs text-muted-foreground">{album.artist}</p>
       {formatStreams(album.streams) && (
-        <p className="mt-0.5 truncate text-[11px] text-muted-foreground/70">
-          {formatStreams(album.streams)} streams
-        </p>
+        <p className="mt-0.5 truncate text-[11px] text-muted-foreground/70">{formatStreams(album.streams)} streams</p>
       )}
     </motion.div>
   );

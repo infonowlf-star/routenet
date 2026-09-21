@@ -15,6 +15,7 @@ import { toast } from "sonner";
 import { formatExactNumber } from "@/utils/formatExactNumber";
 import { toTitleCase } from "@/utils/toTitleCase";
 import { supabase } from "@/integrations/supabase/client";
+import { genreArtistMap } from "@/constants/genreArtists";
 
 interface Release {
   id: string;
@@ -166,6 +167,19 @@ const ArtistDetail = () => {
     id: s.id, name: s.name, avatar: s.avatar || PLACEHOLDER_ART, monthlyListeners: s.monthlyListeners || 0,
   })) || [];
 
+  const suggestedArtists = useMemo(() => {
+    const names = artist?.genre ? (genreArtistMap[artist.genre] || []) : [];
+    return names
+      .filter((name) => name.toLowerCase() !== (artist?.name || "").toLowerCase())
+      .slice(0, 8)
+      .map((name, index) => ({
+        id: `suggested-${index}-${name}`,
+        name,
+        avatar: PLACEHOLDER_ART,
+        monthlyListeners: 650000 + index * 180000,
+      }));
+  }, [artist?.genre, artist?.name]);
+
   if (!artist && !isLoading) return <div className="flex h-full items-center justify-center"><p className="text-muted-foreground">artist not found</p></div>;
   if (isLoading && !artist) return <div className="flex h-full items-center justify-center gap-2"><Loader2 className="h-6 w-6 animate-spin text-primary" /><p className="text-muted-foreground">loading artist...</p></div>;
 
@@ -199,14 +213,14 @@ const ArtistDetail = () => {
   return (
     <div className="min-h-full pb-32">
       <div className="relative h-80 overflow-hidden">
-        <div className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: `url(${bannerImage})` }} />
-        <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-black/60 to-background" />
+        <div className="absolute inset-0 bg-cover bg-center saturate-150" style={{ backgroundImage: `url(${bannerImage})` }} />
+        <div className="absolute inset-0 bg-gradient-to-b from-black/30 via-black/60 to-background" />
         <motion.button initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} onClick={() => navigate(-1)}
-          className="absolute left-4 top-4 rounded-full bg-black/40 p-2 transition-colors hover:bg-black/60">
+          className="absolute left-4 top-4 rounded-full bg-black/40 p-2 text-white transition-colors hover:bg-black/60">
           <ArrowLeft className="h-5 w-5" />
         </motion.button>
         {isLoading && (
-          <div className="absolute right-4 top-4 flex items-center gap-2 rounded-full bg-black/40 px-3 py-1">
+          <div className="absolute right-4 top-4 flex items-center gap-2 rounded-full bg-black/40 px-3 py-1 text-white">
             <Loader2 className="h-4 w-4 animate-spin text-primary" /><span className="text-xs">updating...</span>
           </div>
         )}
@@ -214,30 +228,56 @@ const ArtistDetail = () => {
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
             <div className="mb-2 flex items-center gap-2">
               <div className="flex h-6 w-6 items-center justify-center rounded-full bg-primary"><Check className="h-3 w-3 text-black" /></div>
-              <span className="text-xs text-muted-foreground">Verified Artist</span>
+              <span className="text-xs text-white/75">Verified Artist</span>
               {(artist as any)?.genre && <span className="rounded-full bg-primary/20 px-2 py-0.5 text-xs text-primary">{toTitleCase((artist as any).genre)}</span>}
             </div>
-            <h1 className="mb-2 text-4xl font-bold">{toTitleCase(artist?.name || "")}</h1>
-            <p className="text-sm text-muted-foreground">
+            <h1 className="mb-2 text-4xl font-black tracking-tight text-white">{toTitleCase(artist?.name || "")}</h1>
+            <p className="text-sm text-white/75">
               {[formatExactNumber(artist?.monthlyListeners || 0) + " fans", (artist as any)?.country].filter(Boolean).join(" · ")}
             </p>
           </motion.div>
         </div>
       </div>
 
-      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className="flex items-center gap-4 px-4 py-4">
-        <Button onClick={handlePlayAll} size="lg" disabled={allTracks.length === 0} className="h-14 w-14 rounded-full bg-primary font-semibold text-black hover:bg-primary/90">
+      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className="flex items-center gap-3 px-4 py-4">
+        <Button onClick={handlePlayAll} size="lg" disabled={allTracks.length === 0} className="h-14 w-14 rounded-full bg-primary font-semibold text-black shadow-[0_18px_32px_rgba(29,185,84,0.25)] hover:bg-primary/90">
           <Play className="ml-1 h-6 w-6 fill-current" />
         </Button>
-        <Button onClick={handleShuffle} variant="ghost" size="icon" disabled={allTracks.length === 0} className="text-primary hover:text-primary/80">
-          <Shuffle className="h-6 w-6" />
+        <Button onClick={handleShuffle} variant="ghost" size="icon" disabled={allTracks.length === 0} className="h-10 w-10 rounded-full bg-white/5 text-primary hover:bg-white/10 hover:text-primary/80">
+          <Shuffle className="h-5 w-5" />
         </Button>
-        <Button onClick={handleLike} variant={isFollowing ? "secondary" : "outline"} className="gap-2 rounded-full border-muted-foreground/50 px-6">
+        <Button onClick={handleLike} variant={isFollowing ? "secondary" : "outline"} className="gap-2 rounded-full border-white/10 bg-white/5 px-5 text-sm font-semibold text-foreground hover:bg-white/10">
           <Heart className={`h-4 w-4 ${isFollowing ? "fill-primary text-primary" : ""}`} />
-          {isFollowing ? "liked" : "like"}
+          {isFollowing ? "Liked" : "Like"}
         </Button>
-        <Button variant="ghost" size="icon"><MoreHorizontal className="h-6 w-6" /></Button>
+        <Button variant="ghost" size="icon" className="h-10 w-10 rounded-full bg-white/5 hover:bg-white/10"><MoreHorizontal className="h-5 w-5" /></Button>
       </motion.div>
+
+      {suggestedArtists.length > 0 && (
+        <motion.section initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25 }} className="mb-8 px-4">
+          <div className="mb-3 flex items-center justify-between">
+            <h2 className="text-xl font-bold">Fans also like</h2>
+            <span className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Curated</span>
+          </div>
+          <div className="flex gap-3 overflow-x-auto pb-2">
+            {suggestedArtists.map((suggested) => (
+              <button
+                key={suggested.id}
+                onClick={() => navigate(`/artist/${encodeURIComponent(suggested.name)}`)}
+                className="group w-28 shrink-0 rounded-[20px] border border-white/10 bg-card/50 p-2 text-left transition-colors hover:border-primary/40"
+              >
+                <div className="mb-2 overflow-hidden rounded-[14px] bg-muted/30">
+                  <img src={suggested.avatar} alt={suggested.name} className="h-24 w-full object-cover transition-transform duration-200 group-hover:scale-105" />
+                </div>
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-semibold">{suggested.name}</p>
+                  <p className="mt-1 text-[10px] uppercase tracking-[0.18em] text-muted-foreground">Similar</p>
+                </div>
+              </button>
+            ))}
+          </div>
+        </motion.section>
+      )}
 
       <motion.section initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }} className="mb-8 px-4">
         <h2 className="mb-4 text-xl font-bold">Popular</h2>

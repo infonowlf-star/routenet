@@ -194,14 +194,14 @@ export default function NowPlaying() {
             <button
               onClick={handleToggleLike}
               aria-label="Like"
-              className={cn("flex h-8 w-8 items-center justify-center rounded-full bg-foreground/15 text-foreground/80", liked && "text-primary")}
+              className={cn("flex h-9 w-9 items-center justify-center rounded-full bg-white/5 text-foreground/80 transition-colors hover:bg-white/10", liked && "bg-primary/15 text-primary")}
             >
               <Heart className="h-[15px] w-[15px]" fill={liked ? "currentColor" : "none"} />
             </button>
             <button
               onClick={() => setShowMore(true)}
               aria-label="More"
-              className="flex h-8 w-8 items-center justify-center rounded-full bg-foreground/15 text-foreground/80"
+              className="flex h-9 w-9 items-center justify-center rounded-full bg-white/5 text-foreground/80 transition-colors hover:bg-white/10"
             >
               <MoreHorizontal className="h-[17px] w-[17px]" />
             </button>
@@ -225,20 +225,20 @@ export default function NowPlaying() {
         </div>
 
         {/* Transport */}
-        <div className="mt-6 flex items-center justify-center gap-14">
-          <button onClick={previous} aria-label="Previous track" className="text-foreground transition-transform active:scale-[0.85]">
-            <SkipBack className="h-[34px] w-[34px]" fill="currentColor" />
+        <div className="mt-6 flex items-center justify-center gap-8">
+          <button onClick={previous} aria-label="Previous track" className="flex h-12 w-12 items-center justify-center rounded-full bg-white/5 text-foreground transition-transform hover:bg-white/10 active:scale-[0.97]">
+            <SkipBack className="h-[26px] w-[26px]" fill="currentColor" />
           </button>
           <button
             onClick={togglePlay}
             disabled={isResolving}
             aria-label={isPlaying ? "Pause" : "Play"}
-            className="text-foreground transition-transform active:scale-[0.85] disabled:opacity-60"
+            className="flex h-16 w-16 items-center justify-center rounded-full bg-primary text-black shadow-[0_16px_42px_rgba(29,185,84,0.35)] transition-transform hover:scale-[1.02] active:scale-[0.98] disabled:opacity-60"
           >
-            {isResolving ? <Loader2 className="h-[42px] w-[42px] animate-spin" /> : isPlaying ? <Pause className="h-[42px] w-[42px]" fill="currentColor" /> : <Play className="h-[42px] w-[42px]" fill="currentColor" />}
+            {isResolving ? <Loader2 className="h-[32px] w-[32px] animate-spin" /> : isPlaying ? <Pause className="h-[30px] w-[30px]" fill="currentColor" /> : <Play className="ml-1 h-[30px] w-[30px]" fill="currentColor" />}
           </button>
-          <button onClick={next} aria-label="Next track" className="text-foreground transition-transform active:scale-[0.85]">
-            <SkipForward className="h-[34px] w-[34px]" fill="currentColor" />
+          <button onClick={next} aria-label="Next track" className="flex h-12 w-12 items-center justify-center rounded-full bg-white/5 text-foreground transition-transform hover:bg-white/10 active:scale-[0.97]">
+            <SkipForward className="h-[26px] w-[26px]" fill="currentColor" />
           </button>
         </div>
 

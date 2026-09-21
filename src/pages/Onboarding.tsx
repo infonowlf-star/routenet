@@ -14,9 +14,9 @@ import {
   Search,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { genreArtistMap } from "@/constants/genreArtists";
 import { lovable } from "@/integrations/lovable";
 import { toast } from "sonner";
+import { genreArtistMap } from "@/constants/genreArtists";
 
 type Step =
   | "welcome"
@@ -54,22 +54,22 @@ interface GenrePick {
 }
 
 const GENRES: GenrePick[] = [
-  { id: 1, name: "Hip-Hop", gradient: "from-secondary/80 to-background" },
-  { id: 2, name: "Pop", gradient: "from-secondary/80 to-background" },
-  { id: 3, name: "R&B", gradient: "from-secondary/80 to-background" },
-  { id: 4, name: "Rock", gradient: "from-secondary/80 to-background" },
-  { id: 5, name: "Electronic", gradient: "from-secondary/80 to-background" },
-  { id: 6, name: "Afrobeats", gradient: "from-secondary/80 to-background" },
-  { id: 7, name: "Indie", gradient: "from-secondary/80 to-background" },
-  { id: 8, name: "Jazz", gradient: "from-secondary/80 to-background" },
-  { id: 9, name: "Classical", gradient: "from-secondary/70 to-background" },
-  { id: 10, name: "Country", gradient: "from-secondary/80 to-background" },
-  { id: 11, name: "Reggae", gradient: "from-secondary/80 to-background" },
-  { id: 12, name: "Metal", gradient: "from-secondary/80 to-background" },
-  { id: 13, name: "Latin", gradient: "from-secondary/80 to-background" },
-  { id: 14, name: "K-Pop", gradient: "from-secondary/80 to-background" },
-  { id: 15, name: "Lo-fi", gradient: "from-secondary/80 to-background" },
-  { id: 16, name: "Gospel", gradient: "from-secondary/80 to-background" },
+  { id: 1, name: "Hip-Hop", gradient: "from-emerald-500/30 via-emerald-400/10 to-background" },
+  { id: 2, name: "Pop", gradient: "from-fuchsia-500/30 via-violet-400/10 to-background" },
+  { id: 3, name: "R&B", gradient: "from-rose-500/30 via-pink-400/10 to-background" },
+  { id: 4, name: "Rock", gradient: "from-orange-500/30 via-amber-400/10 to-background" },
+  { id: 5, name: "Electronic", gradient: "from-cyan-500/30 via-sky-400/10 to-background" },
+  { id: 6, name: "Afrobeats", gradient: "from-yellow-500/30 via-amber-400/10 to-background" },
+  { id: 7, name: "Indie", gradient: "from-violet-500/30 via-purple-400/10 to-background" },
+  { id: 8, name: "Jazz", gradient: "from-blue-500/30 via-indigo-400/10 to-background" },
+  { id: 9, name: "Classical", gradient: "from-slate-300/20 via-slate-200/10 to-background" },
+  { id: 10, name: "Country", gradient: "from-red-500/30 via-orange-400/10 to-background" },
+  { id: 11, name: "Reggae", gradient: "from-lime-500/30 via-green-400/10 to-background" },
+  { id: 12, name: "Metal", gradient: "from-zinc-500/30 via-slate-400/10 to-background" },
+  { id: 13, name: "Latin", gradient: "from-teal-500/30 via-cyan-400/10 to-background" },
+  { id: 14, name: "K-Pop", gradient: "from-pink-500/30 via-rose-400/10 to-background" },
+  { id: 15, name: "Lo-fi", gradient: "from-indigo-500/30 via-sky-400/10 to-background" },
+  { id: 16, name: "Gospel", gradient: "from-amber-500/30 via-yellow-400/10 to-background" },
 ];
 
 const SUBGENRES_BY_GENRE: Record<string, string[]> = {
@@ -92,18 +92,34 @@ const SUBGENRES_BY_GENRE: Record<string, string[]> = {
 };
 
 const MOODS = [
-  { name: "Chill", gradient: "from-secondary/80 to-background" },
-  { name: "Party", gradient: "from-secondary/80 to-background" },
-  { name: "Focus", gradient: "from-secondary/70 to-background" },
-  { name: "Workout", gradient: "from-secondary/80 to-background" },
-  { name: "Sleep", gradient: "from-secondary/70 to-background" },
-  { name: "Romance", gradient: "from-secondary/80 to-background" },
-  { name: "Sad", gradient: "from-secondary/80 to-background" },
-  { name: "Happy", gradient: "from-secondary/80 to-background" },
+  { name: "Chill", gradient: "from-cyan-500/30 via-sky-400/10 to-background" },
+  { name: "Party", gradient: "from-fuchsia-500/30 via-pink-400/10 to-background" },
+  { name: "Focus", gradient: "from-violet-500/30 via-indigo-400/10 to-background" },
+  { name: "Workout", gradient: "from-emerald-500/30 via-lime-400/10 to-background" },
+  { name: "Sleep", gradient: "from-slate-400/30 via-slate-200/10 to-background" },
+  { name: "Romance", gradient: "from-rose-500/30 via-pink-400/10 to-background" },
+  { name: "Sad", gradient: "from-blue-500/30 via-indigo-400/10 to-background" },
+  { name: "Happy", gradient: "from-yellow-500/30 via-amber-400/10 to-background" },
 ];
 
-
-const TOP_ARTISTS_BY_GENRE = genreArtistMap;
+const CURATED_ARTISTS_BY_GENRE: Record<string, string[]> = {
+  "Hip-Hop": ["Drake", "Kendrick Lamar", "Travis Scott", "SZA", "J. Cole", "Doja Cat", "Tyler, The Creator", "Lil Baby"],
+  Pop: ["Taylor Swift", "Dua Lipa", "Olivia Rodrigo", "The Weeknd", "Billie Eilish", "Ariana Grande", "Sabrina Carpenter", "Harry Styles"],
+  "R&B": ["SZA", "Giveon", "Summer Walker", "H.E.R.", "Brent Faiyaz", "Usher", "Jhené Aiko", "Daniel Caesar"],
+  Rock: ["The Staves", "The 1975", "Arctic Monkeys", "Tame Impala", "The Killers", "Nirvana", "Paramore", "Red Hot Chili Peppers"],
+  Electronic: ["Fred again..", "Disclosure", "Calvin Harris", "David Guetta", "Avicii", "Martin Garrix", "Skrillex", "Major Lazer"],
+  Afrobeats: ["Burna Boy", "Wizkid", "Tems", "Rema", "Asake", "Davido", "Ayra Starr", "Omah Lay"],
+  Indie: ["Clairo", "Tame Impala", "Phoebe Bridgers", "Mitski", "Vampire Weekend", "The 1975", "Lorde", "Mac DeMarco"],
+  Jazz: ["Miles Davis", "John Coltrane", "Ella Fitzgerald", "Nina Simone", "Herbie Hancock", "Kamasi Washington", "Norah Jones", "Chet Baker"],
+  Classical: ["Ludovico Einaudi", "Yo-Yo Ma", "Lang Lang", "Hans Zimmer", "Bach", "Beethoven", "Chopin", "Mozart"],
+  Country: ["Morgan Wallen", "Luke Combs", "Chris Stapleton", "Zach Bryan", "Lainey Wilson", "Dolly Parton", "Shania Twain", "Kacey Musgraves"],
+  Reggae: ["Bob Marley & The Wailers", "Sean Paul", "Damian Marley", "Shaggy", "Chronixx", "Koffee", "Protoje", "Buju Banton"],
+  Metal: ["Metallica", "Slipknot", "System Of A Down", "Bring Me The Horizon", "Iron Maiden", "Linkin Park", "Deftones", "Avenged Sevenfold"],
+  Latin: ["Bad Bunny", "Karol G", "J Balvin", "Shakira", "Feid", "Rauw Alejandro", "Peso Pluma", "Maluma"],
+  "K-Pop": ["BTS", "BLACKPINK", "NewJeans", "Stray Kids", "TWICE", "SEVENTEEN", "IVE", "LE SSERAFIM"],
+  "Lo-fi": ["Nujabes", "Jinsang", "idealism", "potsu", "Kupla", "Tomppabeats", "j^p^n", "bsd.u"],
+  Gospel: ["Kirk Franklin", "Tasha Cobbs Leonard", "Maverick City Music", "CeCe Winans", "Elevation Worship", "Mary Mary", "Fred Hammond", "Jonathan McReynolds"],
+};
 
 function saveOnboarding(data: any) {
   try {
@@ -296,8 +312,15 @@ export default function Onboarding() {
     setLoadingArtists(true);
     setArtistsError(false);
     try {
-      // 1. Recognizable top artists first so onboarding immediately feels relevant.
-      const seedNames = Array.from(new Set(selectedGenres.flatMap((g) => TOP_ARTISTS_BY_GENRE[g.name] || [])));
+      const curatedArtistsForGenre = (genre: string) => {
+        const direct = genreArtistMap[genre] || CURATED_ARTISTS_BY_GENRE[genre] || [];
+        return Array.from(new Set(direct));
+      };
+
+      // 1. Curated artist seeds per genre so the onboarding experience feels polished and consistent across all genres.
+      const seedNames = Array.from(
+        new Set(selectedGenres.flatMap((g) => curatedArtistsForGenre(g.name))),
+      );
       const knownArtists = await resolveKnownArtists(seedNames, 28);
 
       // 2. Sub-genres (more specific)
@@ -310,9 +333,11 @@ export default function Onboarding() {
         selectedGenres.slice(0, 4).map((g) => fetchArtistsForStyle(g.name, 10)),
       );
 
-      // 4. Similar artists from the recognizable seeds.
+      // 4. Similar artists from the recognizable seeds, plus a direct recommendation when the user has already picked an artist.
       const relatedLists = await Promise.all(
-        knownArtists.slice(0, 4).map((a) => fetchRelatedArtists(a.id, 6)),
+        selectedArtists.length > 0
+          ? selectedArtists.slice(0, 4).map((a) => fetchRelatedArtists(a.id, 6))
+          : knownArtists.slice(0, 4).map((a) => fetchRelatedArtists(a.id, 6)),
       );
 
       const buckets = [knownArtists, ...subgenreLists, ...genreLists, ...relatedLists].filter((l) => l.length > 0);
@@ -436,114 +461,140 @@ export default function Onboarding() {
   };
 
   return (
-    <main className="relative min-h-screen bg-background text-foreground">
-      <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(circle_at_50%_-10%,hsl(var(--primary)/0.35),transparent_55%),linear-gradient(180deg,hsl(var(--background)),hsl(0_0%_0%))]" />
+    <main className="relative min-h-screen overflow-hidden bg-background text-foreground">
+      <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(circle_at_top,hsl(var(--primary)/0.18),transparent_35%),radial-gradient(circle_at_bottom_right,hsl(0_0%_100%/0.06),transparent_30%),linear-gradient(180deg,hsl(var(--background))_0%,hsl(0_0%_0%)_100%)]" />
 
-      <div className="relative mx-auto flex min-h-screen max-w-md flex-col px-6 pb-8 pt-12">
-        <div className="mb-8 flex items-center justify-between">
-          {step !== "welcome" && step !== "done" ? (
-            <button
-              onClick={() => {
-                const prev = STEP_ORDER[stepIdx - 1];
-                if (prev) goto(prev);
-              }}
-              className="flex h-10 w-10 items-center justify-center rounded-full bg-secondary/60 backdrop-blur-md"
-            >
-              <ChevronLeft className="h-5 w-5" />
-            </button>
-          ) : (
-            <div className="h-10 w-10" />
-          )}
-          <ProgressDots index={stepIdx} total={STEP_ORDER.length} />
-          {step === "genres" || step === "subgenres" || step === "artists" || step === "similar" || step === "mood" ? (
-            <button
-              onClick={() => {
-                const next = STEP_ORDER[stepIdx + 1];
-                if (next) goto(next);
-              }}
-              className="text-xs font-bold uppercase tracking-wider text-muted-foreground hover:text-foreground"
-            >
-              Skip
-            </button>
-          ) : (
-            <div className="h-10 w-10" />
-          )}
+      <div className="relative mx-auto flex min-h-screen w-full max-w-5xl flex-col px-4 pb-8 pt-6 sm:px-6 lg:px-10">
+        <div className="mx-auto w-full max-w-xl">
+          <div className="mb-6 flex items-center justify-between gap-3">
+            {step !== "welcome" && step !== "done" ? (
+              <button
+                onClick={() => {
+                  const prev = STEP_ORDER[stepIdx - 1];
+                  if (prev) goto(prev);
+                }}
+                className="flex h-11 w-11 items-center justify-center rounded-full border border-white/10 bg-white/5 text-foreground backdrop-blur-md transition-all hover:border-primary/40 hover:bg-primary/10"
+              >
+                <ChevronLeft className="h-5 w-5" />
+              </button>
+            ) : (
+              <div className="h-11 w-11" />
+            )}
+
+            <div className="flex-1 px-3">
+              <ProgressDots index={stepIdx} total={STEP_ORDER.length} />
+            </div>
+
+            {step === "genres" || step === "subgenres" || step === "artists" || step === "similar" || step === "mood" ? (
+              <button
+                onClick={() => {
+                  const next = STEP_ORDER[stepIdx + 1];
+                  if (next) goto(next);
+                }}
+                className="text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground transition-colors hover:text-foreground"
+              >
+                Skip
+              </button>
+            ) : (
+              <div className="h-11 w-11" />
+            )}
+          </div>
         </div>
 
         <AnimatePresence mode="wait">
           <motion.div
             key={step}
-            initial={{ opacity: 0, y: 12 }}
+            initial={{ opacity: 0, y: 18 }}
             animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -12 }}
+            exit={{ opacity: 0, y: -18 }}
             transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
-            className="flex flex-1 flex-col"
+            className="mx-auto w-full max-w-xl flex-1"
           >
             {step === "welcome" && (
-              <div className="flex flex-1 flex-col items-center justify-center text-center">
+              <div className="flex min-h-[70vh] flex-col items-center justify-center px-2 text-center">
                 <motion.div
-                  initial={{ scale: 0.6, opacity: 0 }}
+                  initial={{ scale: 0.7, opacity: 0 }}
                   animate={{ scale: 1, opacity: 1 }}
                   transition={{ duration: 0.6, ease: "easeOut" }}
-                  className="mb-6 flex h-20 w-20 items-center justify-center rounded-2xl bg-primary"
+                  className="mb-7 flex h-24 w-24 items-center justify-center rounded-[28px] border border-primary/30 bg-gradient-to-br from-primary via-primary/90 to-[#1b4d3e] shadow-[0_20px_50px_rgba(170,255,200,0.18)]"
                 >
-                  <Music2 className="h-10 w-10 text-primary-foreground" />
+                  <Music2 className="h-11 w-11 text-white" />
                 </motion.div>
-                <h1 className="text-3xl font-bold tracking-tight">Routenet</h1>
-                <p className="mt-3 max-w-xs text-sm font-medium text-muted-foreground">
-                  Millions of songs. Personalized by AI. Made for the way you listen.
+
+                <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.24em] text-muted-foreground">
+                  <Sparkles className="h-3.5 w-3.5 text-primary" />
+                  Curated for your taste
+                </div>
+
+                <h1 className="text-4xl font-black tracking-tight sm:text-5xl">Routenet</h1>
+                <p className="mt-4 max-w-md text-base font-medium leading-relaxed text-muted-foreground">
+                  Discover music that fits your world—tailored by genre, mood, and the artists you actually love.
                 </p>
-                <button
-                  onClick={() => goto("genres")}
-                  className="mt-12 flex h-11 w-full items-center justify-center gap-2 rounded-full bg-primary text-sm font-semibold text-primary-foreground transition-transform active:scale-95"
-                >
-                  Get Started <ArrowRight className="h-5 w-5" />
-                </button>
-                <button
-                  onClick={() => {
-                    localStorage.setItem("routenet-guest", "true");
-                    goto("genres");
-                  }}
-                  className="mt-4 text-xs font-bold uppercase tracking-widest text-muted-foreground hover:text-foreground"
-                >
-                  Continue as Guest
-                </button>
+
+                <div className="mt-10 w-full space-y-3">
+                  <button
+                    onClick={() => goto("genres")}
+                    className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-primary text-sm font-semibold text-primary-foreground shadow-[0_14px_32px_rgba(244,63,94,0.32)] transition-transform hover:scale-[1.01] active:scale-95"
+                  >
+                    Get Started <ArrowRight className="h-4 w-4" />
+                  </button>
+                  <button
+                    onClick={() => {
+                      localStorage.setItem("routenet-guest", "true");
+                      goto("genres");
+                    }}
+                    className="w-full text-[11px] font-semibold uppercase tracking-[0.22em] text-muted-foreground transition-colors hover:text-foreground"
+                  >
+                    Continue as Guest
+                  </button>
+                </div>
+
                 <button
                   onClick={() => navigate("/auth")}
-                  className="mt-5 text-xs font-semibold text-muted-foreground underline underline-offset-4 hover:text-foreground"
+                  className="mt-6 text-sm font-medium text-foreground/80 underline decoration-border underline-offset-4 hover:text-white"
                 >
                   Create an account
                 </button>
-
               </div>
             )}
 
-
             {step === "genres" && (
-              <div className="flex flex-1 flex-col">
-                <h1 className="text-2xl font-bold leading-tight">
-                  What do you <span className="text-primary">love</span> to listen to?
-                </h1>
-                <p className="mt-2 text-sm font-medium text-muted-foreground">
-                  Pick a few genres. We'll use them to tune your recommendations.
+              <div className="flex min-h-[70vh] flex-col rounded-[30px] border border-white/10 bg-white/[0.02] p-5 shadow-[0_20px_60px_rgba(0,0,0,0.38)] backdrop-blur-xl sm:p-6">
+                <div className="mb-2">
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.24em] text-primary">Step 1</p>
+                  <h1 className="mt-3 text-3xl font-black tracking-tight">
+                    Choose your sound
+                  </h1>
+                </div>
+                <p className="mt-2 text-sm text-muted-foreground">
+                  Pick the genres that shape how you listen, then we’ll build a feed around them.
                 </p>
-                <div className="mt-6 grid flex-1 grid-cols-2 gap-3 overflow-y-auto pb-4">
+
+                <div className="mt-6 grid flex-1 grid-cols-2 gap-3 overflow-y-auto pb-2 pr-1 md:grid-cols-4">
                   {GENRES.map((g) => {
                     const active = selectedGenres.some((x) => x.id === g.id);
                     return (
                       <motion.button
                         key={g.id}
-                        whileTap={{ scale: 0.96 }}
+                        whileTap={{ scale: 0.98 }}
                         onClick={() => toggleGenre(g)}
-                        className={`relative h-24 overflow-hidden rounded-2xl bg-gradient-to-br ${g.gradient} p-3 text-left transition-all ${
-                          active ? "ring-2 ring-primary ring-offset-2 ring-offset-background" : ""
+                        className={`group relative h-28 overflow-hidden rounded-[22px] border bg-gradient-to-br ${g.gradient} p-3 text-left shadow-[inset_0_1px_0_rgba(255,255,255,0.12)] transition-all duration-200 ${
+                          active
+                            ? "border-primary/60 ring-2 ring-primary/40 shadow-[0_18px_40px_rgba(244,63,94,0.18)]"
+                            : "border-white/10 hover:border-white/20 hover:translate-y-[-1px]"
                         }`}
                       >
-                        <span className="absolute bottom-3 left-3 text-lg font-black text-white drop-shadow">
-                          {g.name}
-                        </span>
+                        <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(0,0,0,0.05),rgba(0,0,0,0.52))]" />
+                        <div className="relative z-10 flex h-full flex-col justify-between">
+                          <span className="text-base font-black tracking-tight text-white drop-shadow-sm md:text-lg">
+                            {g.name}
+                          </span>
+                          <span className="text-[10px] font-medium uppercase tracking-[0.16em] text-white/75">
+                            {active ? "Selected" : "Discover"}
+                          </span>
+                        </div>
                         {active && (
-                          <span className="absolute right-2 top-2 flex h-6 w-6 items-center justify-center rounded-full bg-primary text-primary-foreground">
+                          <span className="absolute right-3 top-3 z-10 flex h-7 w-7 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg shadow-primary/30">
                             <Check className="h-4 w-4" />
                           </span>
                         )}
@@ -551,29 +602,34 @@ export default function Onboarding() {
                     );
                   })}
                 </div>
+
                 <button
                   disabled={selectedGenres.length < 1}
                   onClick={() => goto("subgenres")}
-                  className="mt-3 h-11 rounded-full bg-primary text-sm font-semibold text-primary-foreground transition-all disabled:opacity-40"
+                  className="mt-4 h-12 rounded-full bg-primary text-sm font-semibold text-primary-foreground transition-all disabled:cursor-not-allowed disabled:opacity-40"
                 >
-                  Continue ({selectedGenres.length} chosen)
+                  Continue ({selectedGenres.length} selected)
                 </button>
               </div>
             )}
 
             {step === "subgenres" && (
-              <div className="flex flex-1 flex-col">
-                <h1 className="text-2xl font-bold leading-tight">
-                  Pick your <span className="text-primary">sub-genres</span>
-                </h1>
-                <p className="mt-2 text-sm font-medium text-muted-foreground">
-                  Narrow it down. This makes your feed a lot sharper.
+              <div className="flex min-h-[70vh] flex-col rounded-[30px] border border-white/10 bg-white/[0.02] p-5 backdrop-blur-xl sm:p-6">
+                <div className="mb-2">
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.24em] text-primary">Step 2</p>
+                  <h1 className="mt-3 text-3xl font-black tracking-tight">
+                    Fine-tune your taste
+                  </h1>
+                </div>
+                <p className="mt-2 text-sm text-muted-foreground">
+                  Choose the scene or sound that best matches your vibe.
                 </p>
-                <div className="mt-6 flex flex-1 flex-wrap content-start gap-2 overflow-y-auto pb-4">
+
+                <div className="mt-6 flex flex-1 flex-wrap content-start gap-2 overflow-y-auto pb-2 pr-1">
                   {availableSubgenres.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">
-                      Pick a genre first to see sub-genres.
-                    </p>
+                    <div className="flex w-full items-center justify-center rounded-2xl border border-dashed border-border/60 bg-secondary/20 p-6 text-center text-sm text-muted-foreground">
+                      Pick at least one genre to unlock sub-genres.
+                    </div>
                   ) : (
                     availableSubgenres.map((s) => {
                       const active = selectedSubgenres.includes(s);
@@ -582,10 +638,10 @@ export default function Onboarding() {
                           key={s}
                           whileTap={{ scale: 0.96 }}
                           onClick={() => toggleSubgenre(s)}
-                          className={`rounded-full border px-4 py-2 text-sm font-bold transition-all ${
+                          className={`rounded-full border px-4 py-2 text-sm font-semibold transition-all ${
                             active
-                              ? "border-primary bg-primary text-primary-foreground"
-                              : "border-border bg-secondary/50 text-foreground hover:border-primary/50"
+                              ? "border-primary bg-primary text-primary-foreground shadow-[0_8px_18px_rgba(244,63,94,0.28)]"
+                              : "border-white/10 bg-secondary/50 text-foreground hover:border-primary/40 hover:text-white"
                           }`}
                         >
                           {s}
@@ -594,20 +650,24 @@ export default function Onboarding() {
                     })
                   )}
                 </div>
+
                 <button
                   onClick={() => goto("artists")}
-                  className="mt-3 h-11 rounded-full bg-primary text-sm font-semibold text-primary-foreground"
+                  className="mt-4 h-12 rounded-full bg-primary text-sm font-semibold text-primary-foreground"
                 >
-                  {selectedSubgenres.length > 0 ? `Continue (${selectedSubgenres.length})` : "Skip sub-genres"}
+                  {selectedSubgenres.length > 0 ? `Continue (${selectedSubgenres.length})` : "Skip for now"}
                 </button>
               </div>
             )}
 
             {step === "artists" && (
-              <div className="flex flex-1 flex-col">
-                <h1 className="text-2xl font-bold leading-tight">Pick artists you like</h1>
-                <p className="mt-1 text-xs font-medium text-muted-foreground">
-                  Based on your taste. Or search below for anyone.
+              <div className="flex min-h-[70vh] flex-col rounded-[30px] border border-white/10 bg-white/[0.02] p-5 backdrop-blur-xl sm:p-6">
+                <div className="mb-2">
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.24em] text-primary">Step 3</p>
+                  <h1 className="mt-3 text-3xl font-black tracking-tight">Follow the artists you love</h1>
+                </div>
+                <p className="mt-2 text-sm text-muted-foreground">
+                  Pick people you stream often or want to hear more from.
                 </p>
 
                 <ArtistSearch
@@ -619,18 +679,18 @@ export default function Onboarding() {
                   }}
                 />
 
-                <div className="mt-4 grid flex-1 grid-cols-3 gap-3 overflow-y-auto pb-4">
+                <div className="mt-4 grid flex-1 grid-cols-2 gap-3 overflow-y-auto pb-2 pr-1 md:grid-cols-4">
                   {loadingArtists ? (
                     Array.from({ length: 12 }).map((_, i) => (
-                      <div key={i} className="shimmer aspect-square rounded-full bg-muted/40" />
+                      <div key={i} className="shimmer aspect-[0.9] rounded-[22px] bg-muted/40" />
                     ))
                   ) : artistsError || artists.length === 0 ? (
-                    <div className="col-span-3 flex flex-col items-center justify-center py-10 text-center">
+                    <div className="col-span-full flex flex-col items-center justify-center rounded-2xl border border-dashed border-border/60 bg-secondary/20 p-6 text-center">
                       <p className="text-sm font-semibold text-foreground">Couldn't load artists</p>
                       <p className="mt-1 text-xs text-muted-foreground">Check your connection and try again.</p>
                       <button
                         onClick={loadArtists}
-                        className="mt-4 rounded-full bg-primary px-5 py-1.5 text-xs font-semibold text-primary-foreground"
+                        className="mt-4 rounded-full bg-primary px-5 py-2 text-xs font-semibold text-primary-foreground"
                       >
                         Retry
                       </button>
@@ -641,13 +701,13 @@ export default function Onboarding() {
                       return (
                         <motion.button
                           key={a.id}
-                          whileTap={{ scale: 0.95 }}
+                          whileTap={{ scale: 0.97 }}
                           onClick={() => toggleArtist(a)}
-                          className="flex flex-col items-center gap-1.5 text-center"
+                          className="flex flex-col items-center gap-2 text-center"
                         >
                           <div
-                            className={`relative aspect-square w-full overflow-hidden rounded-full ${
-                              active ? "ring-2 ring-primary" : "ring-1 ring-border"
+                            className={`relative aspect-square w-full overflow-hidden rounded-[22px] border transition-all ${
+                              active ? "border-primary ring-2 ring-primary/40 shadow-[0_16px_34px_rgba(244,63,94,0.14)]" : "border-white/10"
                             }`}
                           >
                             {a.picture ? (
@@ -656,12 +716,12 @@ export default function Onboarding() {
                               <div className="h-full w-full bg-secondary" />
                             )}
                             {active && (
-                              <div className="absolute inset-0 flex items-center justify-center bg-primary/45">
+                              <div className="absolute inset-0 flex items-center justify-center bg-primary/45 backdrop-blur-[1px]">
                                 <Check className="h-5 w-5 text-primary-foreground" />
                               </div>
                             )}
                           </div>
-                          <span className="line-clamp-2 w-full text-[11px] font-semibold leading-tight">
+                          <span className="line-clamp-2 w-full text-[11px] font-semibold leading-tight text-foreground/90">
                             {a.name}
                           </span>
                         </motion.button>
@@ -669,10 +729,11 @@ export default function Onboarding() {
                     })
                   )}
                 </div>
+
                 <button
                   disabled={selectedArtists.length < 3}
                   onClick={() => goto("similar")}
-                  className="mt-3 h-11 rounded-full bg-primary text-sm font-semibold text-primary-foreground transition-all disabled:opacity-40"
+                  className="mt-4 h-12 rounded-full bg-primary text-sm font-semibold text-primary-foreground transition-all disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   Continue ({selectedArtists.length}/3)
                 </button>
@@ -680,49 +741,54 @@ export default function Onboarding() {
             )}
 
             {step === "similar" && (
-              <div className="flex flex-1 flex-col">
-                <h1 className="text-2xl font-bold leading-tight">More like your picks</h1>
-                <p className="mt-2 text-sm font-medium text-muted-foreground">
-                  Based on the artists you selected. Add any you love.
+              <div className="flex min-h-[70vh] flex-col rounded-[30px] border border-white/10 bg-white/[0.02] p-5 backdrop-blur-xl sm:p-6">
+                <div className="mb-2">
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.24em] text-primary">Step 4</p>
+                  <h1 className="mt-3 text-3xl font-black tracking-tight">More like these</h1>
+                </div>
+                <p className="mt-2 text-sm text-muted-foreground">
+                  Add a few more artists to tighten the recommendations.
                 </p>
-                <div className="mt-6 grid flex-1 grid-cols-3 gap-3 overflow-y-auto pb-4">
+
+                <div className="mt-6 grid flex-1 grid-cols-2 gap-3 overflow-y-auto pb-2 pr-1 md:grid-cols-4">
                   {loadingSimilar
-                    ? Array.from({ length: 9 }).map((_, i) => (
-                        <div key={i} className="shimmer aspect-square rounded-2xl bg-muted/40" />
+                    ? Array.from({ length: 8 }).map((_, i) => (
+                        <div key={i} className="shimmer aspect-[0.92] rounded-[22px] bg-muted/40" />
                       ))
                     : similarArtists.map((a) => {
                         const active = selectedArtists.some((x) => x.id === a.id);
                         return (
                           <motion.button
                             key={a.id}
-                            whileTap={{ scale: 0.95 }}
+                            whileTap={{ scale: 0.97 }}
                             onClick={() => toggleArtist(a)}
-                            className="flex flex-col items-center gap-1.5 text-center"
+                            className="flex flex-col items-center gap-2 text-center"
                           >
                             <div
-                              className={`relative aspect-square w-full overflow-hidden rounded-full ${
-                                active ? "ring-4 ring-primary" : "ring-1 ring-border"
+                              className={`relative aspect-square w-full overflow-hidden rounded-[22px] border transition-all ${
+                                active ? "border-primary ring-2 ring-primary/40 shadow-[0_16px_34px_rgba(244,63,94,0.14)]" : "border-white/10"
                               }`}
                             >
                               {a.picture && (
                                 <img src={a.picture} alt={a.name} className="h-full w-full object-cover" loading="lazy" />
                               )}
                               {active && (
-                                <div className="absolute inset-0 flex items-center justify-center bg-primary/50">
-                                  <Check className="h-6 w-6 text-primary-foreground" />
+                                <div className="absolute inset-0 flex items-center justify-center bg-primary/50 backdrop-blur-[1px]">
+                                  <Check className="h-5 w-5 text-primary-foreground" />
                                 </div>
                               )}
                             </div>
-                            <span className="line-clamp-2 w-full text-[11px] font-bold leading-tight">
+                            <span className="line-clamp-2 w-full text-[11px] font-semibold leading-tight text-foreground/90">
                               {a.name}
                             </span>
                           </motion.button>
                         );
                       })}
                 </div>
+
                 <button
                   onClick={() => goto("notifications")}
-                  className="mt-3 h-11 rounded-full bg-primary text-sm font-semibold text-primary-foreground"
+                  className="mt-4 h-12 rounded-full bg-primary text-sm font-semibold text-primary-foreground"
                 >
                   Continue
                 </button>
@@ -730,15 +796,19 @@ export default function Onboarding() {
             )}
 
             {step === "notifications" && (
-              <div className="flex flex-1 flex-col">
-                <div className="mx-auto mb-6 mt-6 flex h-20 w-20 items-center justify-center rounded-3xl bg-primary/15 text-primary">
-                  <Bell className="h-10 w-10" />
+              <div className="flex min-h-[70vh] flex-col rounded-[30px] border border-white/10 bg-white/[0.02] p-5 backdrop-blur-xl sm:p-6">
+                <div className="mx-auto mb-6 mt-4 flex h-20 w-20 items-center justify-center rounded-[24px] bg-primary/10 text-primary ring-1 ring-primary/20">
+                  <Bell className="h-9 w-9" />
                 </div>
-                <h1 className="text-center text-2xl font-bold leading-tight">Stay in the loop</h1>
-                <p className="mt-2 text-center text-sm font-medium text-muted-foreground">
-                  Only what you care about. You can change these anytime.
+                <div className="text-center">
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.24em] text-primary">Preferences</p>
+                  <h1 className="mt-3 text-3xl font-black tracking-tight">Stay in the loop</h1>
+                </div>
+                <p className="mt-3 text-center text-sm text-muted-foreground">
+                  Only the updates that matter to you, with full control any time.
                 </p>
-                <div className="mt-8 space-y-2">
+
+                <div className="mt-8 space-y-3">
                   {[
                     { key: "newReleases", label: "New releases from artists you follow" },
                     { key: "artistUpdates", label: "Artist announcements & tours" },
@@ -750,9 +820,9 @@ export default function Onboarding() {
                       onClick={() =>
                         setNotifPrefs((p) => ({ ...p, [opt.key]: !p[opt.key as keyof typeof p] }))
                       }
-                      className="flex w-full items-center justify-between rounded-2xl border border-border/60 bg-card/50 p-4 text-left"
+                      className="flex w-full items-center justify-between rounded-2xl border border-white/10 bg-secondary/30 p-4 text-left transition-colors hover:border-primary/30"
                     >
-                      <span className="text-sm font-bold">{opt.label}</span>
+                      <span className="text-sm font-semibold text-foreground/90">{opt.label}</span>
                       <span
                         className={`flex h-6 w-11 items-center rounded-full p-0.5 transition-colors ${
                           notifPrefs[opt.key as keyof typeof notifPrefs] ? "bg-primary" : "bg-muted"
@@ -767,9 +837,10 @@ export default function Onboarding() {
                     </button>
                   ))}
                 </div>
+
                 <button
                   onClick={() => goto("mood")}
-                  className="mt-auto h-11 rounded-full bg-primary text-sm font-semibold text-primary-foreground"
+                  className="mt-auto h-12 rounded-full bg-primary text-sm font-semibold text-primary-foreground"
                 >
                   Continue
                 </button>
@@ -777,30 +848,42 @@ export default function Onboarding() {
             )}
 
             {step === "mood" && (
-              <div className="flex flex-1 flex-col">
-                <h1 className="text-2xl font-bold leading-tight">
-                  What's your <span className="text-primary">mood</span>?
-                </h1>
-                <p className="mt-2 text-sm font-medium text-muted-foreground">
-                  Pick the vibes you want to hear right now.
+              <div className="flex min-h-[70vh] flex-col rounded-[30px] border border-white/10 bg-white/[0.02] p-5 backdrop-blur-xl sm:p-6">
+                <div className="mb-2">
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.24em] text-primary">Step 5</p>
+                  <h1 className="mt-3 text-3xl font-black tracking-tight">
+                    What are you in the mood for?
+                  </h1>
+                </div>
+                <p className="mt-2 text-sm text-muted-foreground">
+                  Pick the vibe you want to hear right now and let the rest of the day follow.
                 </p>
-                <div className="mt-6 grid flex-1 grid-cols-2 gap-3 overflow-y-auto pb-4">
+
+                <div className="mt-6 grid flex-1 grid-cols-2 gap-3 overflow-y-auto pb-2 pr-1 md:grid-cols-4">
                   {MOODS.map((m) => {
                     const active = selectedMoods.includes(m.name);
                     return (
                       <motion.button
                         key={m.name}
-                        whileTap={{ scale: 0.96 }}
+                        whileTap={{ scale: 0.98 }}
                         onClick={() => toggleMood(m.name)}
-                        className={`relative h-24 overflow-hidden rounded-2xl bg-gradient-to-br ${m.gradient} p-3 text-left transition-all ${
-                          active ? "ring-2 ring-primary ring-offset-2 ring-offset-background" : ""
+                        className={`relative h-28 overflow-hidden rounded-[22px] border bg-gradient-to-br ${m.gradient} p-3 text-left shadow-[inset_0_1px_0_rgba(255,255,255,0.12)] transition-all ${
+                          active
+                            ? "border-primary/60 ring-2 ring-primary/40 shadow-[0_18px_40px_rgba(244,63,94,0.18)]"
+                            : "border-white/10 hover:border-white/20 hover:translate-y-[-1px]"
                         }`}
                       >
-                        <span className="absolute bottom-3 left-3 text-lg font-black text-white drop-shadow">
-                          {m.name}
-                        </span>
+                        <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(0,0,0,0.04),rgba(0,0,0,0.48))]" />
+                        <div className="relative z-10 flex h-full flex-col justify-between">
+                          <span className="text-base font-black tracking-tight text-white drop-shadow-sm md:text-lg">
+                            {m.name}
+                          </span>
+                          <span className="text-[10px] font-medium uppercase tracking-[0.16em] text-white/70">
+                            {active ? "Selected" : "Set"}
+                          </span>
+                        </div>
                         {active && (
-                          <span className="absolute right-2 top-2 flex h-6 w-6 items-center justify-center rounded-full bg-primary text-primary-foreground">
+                          <span className="absolute right-3 top-3 z-10 flex h-7 w-7 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg shadow-primary/20">
                             <Check className="h-4 w-4" />
                           </span>
                         )}
@@ -808,9 +891,10 @@ export default function Onboarding() {
                     );
                   })}
                 </div>
+
                 <button
                   onClick={() => goto("done")}
-                  className="mt-3 h-11 rounded-full bg-primary text-sm font-semibold text-primary-foreground"
+                  className="mt-4 h-12 rounded-full bg-primary text-sm font-semibold text-primary-foreground"
                 >
                   Continue
                 </button>
@@ -818,24 +902,25 @@ export default function Onboarding() {
             )}
 
             {step === "done" && (
-              <div className="flex flex-1 flex-col items-center justify-center text-center">
+              <div className="flex min-h-[70vh] flex-col items-center justify-center rounded-[30px] border border-white/10 bg-white/[0.02] p-6 text-center backdrop-blur-xl">
                 <motion.div
                   initial={{ scale: 0.5, opacity: 0 }}
                   animate={{ scale: 1, opacity: 1 }}
                   transition={{ type: "spring", damping: 12 }}
-                  className="mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-primary"
+                  className="mb-6 flex h-24 w-24 items-center justify-center rounded-full bg-gradient-to-br from-primary via-primary/90 to-[#2b4b3b] shadow-[0_20px_50px_rgba(244,63,94,0.28)]"
                 >
-                  <Sparkles className="h-10 w-10 text-primary-foreground" />
+                  <Sparkles className="h-10 w-10 text-white" />
                 </motion.div>
-                <h1 className="text-2xl font-bold">You're all set</h1>
-                <p className="mt-3 max-w-xs text-sm font-medium text-muted-foreground">
-                  Your feed is being tuned by AI. It only gets better the more you listen.
+                <p className="text-[10px] font-semibold uppercase tracking-[0.24em] text-primary">Ready</p>
+                <h1 className="mt-3 text-3xl font-black tracking-tight">You’re all set</h1>
+                <p className="mt-3 max-w-xs text-sm leading-relaxed text-muted-foreground">
+                  Your recommendations are now tuned around the music you actually like.
                 </p>
                 <button
                   onClick={finish}
-                  className="mt-12 flex h-11 w-full items-center justify-center gap-2 rounded-full bg-primary text-sm font-semibold text-primary-foreground"
+                  className="mt-10 flex h-12 w-full items-center justify-center gap-2 rounded-full bg-primary text-sm font-semibold text-primary-foreground shadow-[0_14px_32px_rgba(244,63,94,0.28)]"
                 >
-                  Start Listening <ArrowRight className="h-5 w-5" />
+                  Start Listening <ArrowRight className="h-4 w-4" />
                 </button>
               </div>
             )}
