@@ -217,11 +217,12 @@ export async function lookupMusicBrainz(type: 'artist' | 'release' | 'recording'
 }
 
 // TheAudioDB API calls
+const emptyAudioDB = null;
 export async function searchAudioDBArtist(name: string): Promise<AudioDBArtist | null> {
   const { data, error } = await supabase.functions.invoke('theaudiodb', {
     body: { action: 'searchArtist', params: { name } }
   });
-  if (error) throw error;
+  if (error) { console.warn("[audiodb]", error); return emptyAudioDB as any; }
   return data?.artists?.[0] || null;
 }
 
@@ -229,7 +230,7 @@ export async function getAudioDBAlbumsByArtist(artistId: string): Promise<AudioD
   const { data, error } = await supabase.functions.invoke('theaudiodb', {
     body: { action: 'getAlbumsByArtist', params: { artistId } }
   });
-  if (error) throw error;
+  if (error) { console.warn("[audiodb]", error); return emptyAudioDB as any; }
   return data?.album || [];
 }
 
@@ -237,7 +238,7 @@ export async function getAudioDBTracksFromAlbum(albumId: string): Promise<AudioD
   const { data, error } = await supabase.functions.invoke('theaudiodb', {
     body: { action: 'getTracksFromAlbum', params: { albumId } }
   });
-  if (error) throw error;
+  if (error) { console.warn("[audiodb]", error); return emptyAudioDB as any; }
   return data?.track || [];
 }
 
@@ -245,7 +246,7 @@ export async function getTrendingAudioDB(country = 'us', type = 'itunes', format
   const { data, error } = await supabase.functions.invoke('theaudiodb', {
     body: { action: 'getTrending', params: { country, type, format } }
   });
-  if (error) throw error;
+  if (error) { console.warn("[audiodb]", error); return emptyAudioDB as any; }
   return data?.trending || [];
 }
 
