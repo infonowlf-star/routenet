@@ -594,6 +594,26 @@ export default function Search() {
           {showMixes && (
             <MixesResults query={debouncedQuery} />
           )}
+
+          {activeFilter === 'all' && (youtubeResults?.length ?? 0) > 0 && (
+            <section>
+              <h2 className="mb-3 text-lg font-bold text-foreground">From YouTube</h2>
+              <div className="space-y-1">
+                {youtubeResults!.map((v) => (
+                  <button key={v.id} onClick={() => playTrack({
+                    id: `yt-${v.id}`, title: v.title, artist: v.channelTitle || "YouTube",
+                    album: "", cover: v.thumbnail || "/placeholder.svg", duration: 0, youtubeId: v.id,
+                  } as unknown as Track)} className="flex w-full items-center gap-3 rounded-xl p-2 text-left hover:bg-muted/40">
+                    <img src={v.thumbnail} alt="" loading="lazy" className="h-12 w-20 shrink-0 rounded-md object-cover" />
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-semibold text-foreground">{v.title}</p>
+                      <p className="truncate text-xs text-muted-foreground">{v.channelTitle}</p>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </section>
+          )}
           {topItems.length === 0 && podcasts.length === 0 && !loadingUnified && !isLoading && (
             <div className="py-12 text-center"><p className="text-muted-foreground">No results found for "{query}"</p></div>
           )}
