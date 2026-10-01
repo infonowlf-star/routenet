@@ -10,7 +10,7 @@
 
 const KEY = "routenet.recommended.v1";
 /** A recommended song can only come back after this long. */
-export const RECOMMEND_BLOCK_MS = 7 * 24 * 60 * 60 * 1000;
+export const RECOMMEND_BLOCK_MS = 3 * 24 * 60 * 60 * 1000;
 const MAX_ENTRIES = 3000;
 
 type Store = Record<string, number>;
