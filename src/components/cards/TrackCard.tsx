@@ -151,7 +151,7 @@ export function TrackCard({ track, index, showIndex, contextTracks, download, hi
                   initial={{ opacity: 0, scale: 0.9 }}
                   animate={{ opacity: 1, scale: 1 }}
                   exit={{ opacity: 0, scale: 0.9 }}
-                  className="absolute right-0 top-8 z-50 min-w-44 rounded-xl bg-card border border-border/30 shadow-xl overflow-hidden"
+                  className="absolute right-0 top-8 z-50 min-w-44 rounded-xl bg-card shadow-xl overflow-hidden"
                 >
                   <button onClick={(e) => {
                     e.stopPropagation();

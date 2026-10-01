@@ -169,7 +169,8 @@ const ArtistDetail = () => {
   }, [deezerData?.albums, apiData?.albums]);
 
   const albums = releases.filter((r) => r.type === "album").slice(0, 12);
-  const epsAndSingles = releases.filter((r) => r.type !== "album").slice(0, 12);
+  const eps = releases.filter((r) => r.type === "ep").slice(0, 12);
+  const singles = releases.filter((r) => r.type === "single").slice(0, 12);
 
   const similarArtists: Artist[] = apiData?.similar?.map((s) => ({
     id: s.id, name: s.name, avatar: s.avatar || PLACEHOLDER_ART, monthlyListeners: s.monthlyListeners || 0,
@@ -209,7 +210,7 @@ const ArtistDetail = () => {
         <h2 className="text-xl font-bold text-foreground">{title}</h2>
         <span className="text-[10px] uppercase tracking-[0.22em] text-muted-foreground">{items[0]?.type || "release"}</span>
       </div>
-      <div className="-mx-4 flex gap-3 overflow-x-auto px-4 pb-3">
+      <div className="-mx-4 flex gap-3 overflow-x-auto px-4 pb-3 custom-scrollbar">
         {items.map((r) => {
           const compact = r.type === "ep" || r.type === "single";
           return (
@@ -304,8 +305,9 @@ const ArtistDetail = () => {
           )}
         </motion.section>
 
-        {albums.length > 0 && <ReleaseRow title="Discography" items={albums} delay={0.1} />}
-        {epsAndSingles.length > 0 && <ReleaseRow title="Singles & EPs" items={epsAndSingles} delay={0.15} />}
+        {albums.length > 0 && <ReleaseRow title="Albums" items={albums} delay={0.1} />}
+        {eps.length > 0 && <ReleaseRow title="EPs" items={eps} delay={0.15} />}
+        {singles.length > 0 && <ReleaseRow title="Singles" items={singles} delay={0.2} />}
 
         {!!videos?.length && (
           <motion.section initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className="mt-8">
@@ -319,7 +321,7 @@ const ArtistDetail = () => {
                   key={v.id}
                   whileTap={{ scale: 0.98 }}
                   onClick={() => playVideo({ id: `yt-${v.id}`, title: v.title, artist: v.channelTitle, youtubeId: v.id, thumbnail: v.thumbnail, duration: v.duration })}
-                  className="w-52 shrink-0 overflow-hidden rounded-[20px] border border-white/10 bg-card/60 p-2 text-left"
+                  className="w-52 shrink-0 overflow-hidden rounded-[20px] bg-card/60 p-2 text-left"
                 >
                   <img src={v.thumbnail} alt={v.title} className="h-28 w-full rounded-[14px] object-cover" onError={(e) => { (e.target as HTMLImageElement).src = PLACEHOLDER_ART; }} />
                   <h3 className="mt-3 line-clamp-2 text-sm font-semibold text-foreground">{v.title}</h3>
