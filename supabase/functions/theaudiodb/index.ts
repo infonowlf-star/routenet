@@ -59,9 +59,10 @@ serve(async (req) => {
     });
 
     if (!response.ok) {
-      const errorText = await response.text();
-      console.error(`TheAudioDB API error: ${response.status}`, errorText);
-      throw new Error(`TheAudioDB API error: ${response.status}`);
+      console.warn(`TheAudioDB upstream ${response.status} for ${action}`);
+      return new Response(JSON.stringify({ artists: null, album: null, track: null, trending: null }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json', 'X-AudioDB-Error': String(response.status) },
+      });
     }
 
     const data = await response.json();
