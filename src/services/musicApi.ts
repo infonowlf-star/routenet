@@ -155,6 +155,8 @@ export interface UnifiedArtist {
   mbid?: string;
   deezerId?: number;
   name: string;
+  realName?: string;
+  age?: number;
   avatar: string;
   banner?: string;
   bio?: string;
