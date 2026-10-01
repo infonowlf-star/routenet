@@ -11,7 +11,6 @@ import { cn } from "@/lib/utils";
 const primary = [
   { path: "/home", label: "Home", icon: Home },
   { path: "/search", label: "Search", icon: Search },
-  { path: "/discover", label: "Discover", icon: Compass },
   { path: "/radio", label: "Radio", icon: Radio },
 ];
 

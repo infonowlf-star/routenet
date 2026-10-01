@@ -277,7 +277,7 @@ const ArtistDetail = () => {
             <Button onClick={handleShuffle} variant="ghost" size="icon" className="h-11 w-11 rounded-full bg-white/5 hover:bg-white/10">
               <Shuffle className="h-4 w-4 text-primary" />
             </Button>
-            <Button onClick={handleLike} variant={isFollowing ? "secondary" : "outline"} className="h-11 rounded-full bg-white/5 px-4 text-sm font-semibold hover:bg-white/10">
+            <Button onClick={handleLike} variant={isFollowing ? "secondary" : "ghost"} className="h-11 rounded-full bg-white/5 px-4 text-sm font-semibold hover:bg-white/10">
               <Heart className={`mr-2 h-4 w-4 ${isFollowing ? "fill-primary text-primary" : ""}`} />
               {isFollowing ? "Liked" : "Follow"}
             </Button>
