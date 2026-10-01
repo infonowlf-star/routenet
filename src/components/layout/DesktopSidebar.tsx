@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Home, Search, Library, Compass, Radio, Heart, Clock3, Plus, Music2 } from "lucide-react";
+import { Home, Search, Library, Radio, Heart, Clock3, Plus, Music2 } from "lucide-react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { AppLogo } from "@/components/brand/AppLogo";
 import { Button } from "@/components/ui/button";
