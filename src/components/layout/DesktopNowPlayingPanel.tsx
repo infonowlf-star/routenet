@@ -11,7 +11,7 @@ export function DesktopNowPlayingPanel() {
   const upNext = currentIndex >= 0 ? queue.slice(currentIndex + 1, currentIndex + 11) : queue.slice(0, 10);
 
   return (
-    <aside className="hidden h-full min-h-0 w-[300px] shrink-0 overflow-y-auto border-0 bg-background-elevated p-4 outline-none xl:block">
+    <aside className="custom-scrollbar hidden h-full min-h-0 w-[280px] shrink-0 overflow-y-auto rounded-md border-0 bg-background-elevated p-4 outline-none xl:block 2xl:w-[300px]">
       <div className="mb-3 flex items-center justify-between">
         <h2 className="text-sm font-bold text-foreground">Now playing</h2>
         <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => navigate("/now-playing")} aria-label="Open player">

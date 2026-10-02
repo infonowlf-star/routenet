@@ -29,13 +29,13 @@ export function DesktopSidebar() {
   }, [location.pathname]);
 
   return (
-    <aside className="hidden h-full min-h-0 w-[248px] shrink-0 flex-col overflow-y-auto bg-sidebar lg:flex">
-      <div className="flex h-16 items-center gap-3 px-5">
+    <aside className="custom-scrollbar hidden h-full min-h-0 w-[260px] shrink-0 flex-col overflow-y-auto bg-sidebar lg:flex xl:w-[280px]">
+      <div className="flex h-14 items-center gap-3 px-4">
         <AppLogo className="h-8 w-8 rounded-md" />
         <span className="text-lg font-black text-sidebar-foreground">routenet</span>
       </div>
 
-      <nav className="space-y-1 px-3 py-3" aria-label="Main navigation">
+      <nav className="space-y-0.5 px-2 py-2" aria-label="Main navigation">
         {primary.map(({ path, label, icon: Icon }) => (
           <NavLink
             key={path}
@@ -53,9 +53,9 @@ export function DesktopSidebar() {
         ))}
       </nav>
 
-      <div className="px-3 pb-6 pt-2">
-        <div className="mb-2 flex items-center justify-between px-3">
-          <span className="text-[11px] font-bold uppercase text-muted-foreground">Your library</span>
+      <div className="mx-2 mt-2 min-h-0 flex-1 rounded-md bg-background-elevated px-2 pb-6 pt-3">
+        <div className="mb-2 flex items-center justify-between px-2">
+          <span className="flex items-center gap-2 text-sm font-bold text-foreground"><Library className="h-4 w-4" /> Your Library</span>
           <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => navigate("/create-playlist")} aria-label="Create playlist">
             <Plus className="h-4 w-4" />
           </Button>
@@ -65,7 +65,7 @@ export function DesktopSidebar() {
           { path: "/liked", label: "Liked Songs", icon: Heart },
           { path: "/recently-played", label: "Recently Played", icon: Clock3 },
         ].map(({ path, label, icon: Icon }) => (
-          <NavLink key={path} to={path} className="flex h-9 items-center gap-3 rounded-md px-3 text-sm text-muted-foreground transition-colors hover:bg-sidebar-accent/60 hover:text-sidebar-foreground">
+          <NavLink key={path} to={path} className="flex h-9 items-center gap-3 rounded-md px-2 text-sm text-muted-foreground transition-colors hover:bg-sidebar-accent/60 hover:text-sidebar-foreground">
             <Icon className="h-4 w-4" />
             {label}
           </NavLink>
@@ -73,12 +73,12 @@ export function DesktopSidebar() {
 
         {playlists.length > 0 && (
           <div className="mt-4">
-            <span className="mb-1 block px-3 text-[11px] font-bold uppercase text-muted-foreground">Playlists</span>
+            <span className="mb-1 block px-2 text-[11px] font-bold uppercase text-muted-foreground">Playlists</span>
             {playlists.map((p) => (
               <button
                 key={p.id}
                 onClick={() => navigate(`/user-playlist/${p.id}`)}
-                className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-left transition-colors hover:bg-sidebar-accent/60"
+                className="flex w-full items-center gap-3 rounded-md px-2 py-1.5 text-left transition-colors hover:bg-sidebar-accent/60"
               >
                 {p.cover_image
                   ? <img src={p.cover_image} alt="" className="h-9 w-9 shrink-0 rounded object-cover" />
@@ -95,12 +95,12 @@ export function DesktopSidebar() {
 
         {liked.length > 0 && (
           <div className="mt-4">
-            <span className="mb-1 block px-3 text-[11px] font-bold uppercase text-muted-foreground">Saved songs</span>
+            <span className="mb-1 block px-2 text-[11px] font-bold uppercase text-muted-foreground">Saved songs</span>
             {liked.slice(0, 20).map((track) => (
               <button
                 key={`${track.title}-${track.artist}`}
                 onClick={() => navigate("/liked")}
-                className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-left transition-colors hover:bg-sidebar-accent/60"
+                className="flex w-full items-center gap-3 rounded-md px-2 py-1.5 text-left transition-colors hover:bg-sidebar-accent/60"
               >
                 <img src={track.artwork || "/placeholder.svg"} alt="" className="h-9 w-9 shrink-0 rounded object-cover" />
                 <span className="min-w-0">
