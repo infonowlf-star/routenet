@@ -12,6 +12,7 @@ import { QuickAccessGrid } from "@/components/home/QuickAccessGrid";
 import { recordTasteEvent } from "@/services/tasteEvents";
 import { AppLogo } from "@/components/brand/AppLogo";
 import { HomeFilterPills, type HomeFilter } from "@/components/home/HomeFilterPills";
+import { Button } from "@/components/ui/button";
 
 import { supabase } from "@/integrations/supabase/client";
 
@@ -124,9 +125,9 @@ export default function Home() {
         <WifiOff className="mb-4 h-12 w-12 text-muted-foreground" />
         <h1 className="mb-2 text-xl font-extrabold text-foreground">You're Offline</h1>
         <p className="mb-6 text-sm text-muted-foreground">Listen to your downloaded songs</p>
-        <button onClick={() => navigate("/library")} className="rounded-full bg-primary px-8 py-3 text-sm font-bold text-primary-foreground">
+        <Button onClick={() => navigate("/library")} className="rounded-full px-8 py-3 text-sm font-bold">
           Go to Downloads
-        </button>
+        </Button>
       </div>
     );
   }
@@ -139,9 +140,9 @@ export default function Home() {
           Welcome to <span className="text-primary">routenet</span>
         </h1>
         <p className="mb-8 text-sm text-muted-foreground">Tell us what you love and we'll build your feed</p>
-        <button onClick={() => navigate("/onboarding")} className="w-64 rounded-full bg-primary py-3 text-sm font-bold text-primary-foreground">
+        <Button onClick={() => navigate("/onboarding")} className="w-64 rounded-full py-3 text-sm font-bold">
           Get started
-        </button>
+        </Button>
       </div>
     );
   }
@@ -154,14 +155,14 @@ export default function Home() {
   const visibleSections = filteredSections.slice(0, visibleCount);
 
   return (
-    <div ref={scrollRef} className="custom-scrollbar relative min-h-screen overflow-y-auto pb-28">
-      <header className="sticky top-0 z-30 bg-background/80 backdrop-blur-xl">
-        <div className="px-4 pb-3 pt-9">
+    <div ref={scrollRef} className="custom-scrollbar relative min-h-screen overflow-y-auto pb-28 lg:min-h-0 lg:pb-8">
+      <header className="sticky top-0 z-30 bg-background/80 backdrop-blur-xl lg:bg-background-elevated/90">
+        <div className="px-4 pb-3 pt-9 lg:px-7 lg:pb-4 lg:pt-3">
           <HomeFilterPills value={filter} onChange={setFilter} />
         </div>
       </header>
 
-      <main className="relative space-y-4 px-4 pt-2">
+      <main className="relative space-y-4 px-4 pt-2 lg:space-y-7 lg:px-7 lg:pt-3">
         <QuickAccessGrid />
         {visibleSections.map((section) => (
           <div key={section.id} className="space-y-4">

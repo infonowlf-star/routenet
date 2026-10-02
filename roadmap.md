@@ -1,5 +1,6 @@
 # Roadmap
 
+- [x] Match desktop music views and cards to the supplied references while retaining Routenet colors
 - [ ] Make the Home mini-player smaller and connect its seek bar to audio playback
 - [ ] Add reusable track artwork fallback and use it in key song surfaces
 - [ ] Rebuild Artist page with top songs, albums, EPs/singles, collaborations, videos, and about

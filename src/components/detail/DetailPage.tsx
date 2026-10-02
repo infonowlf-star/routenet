@@ -18,6 +18,7 @@ import { downloadTrack, lastDownloadError } from "@/services/downloadService";
 import { getDownloadedIds, DOWNLOADS_CHANGED } from "@/services/indexedDBService";
 import { formatStreams } from "@/utils/formatStreams";
 import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
 
 export type DlState = Record<string, { status: "pending" | "downloading" | "done" | "failed"; percent: number }>;
 
@@ -101,15 +102,15 @@ export function DetailPage({
   return (
     <div className="bg-background pb-4 lg:min-h-full lg:pb-0">
       {/* Header wash from the artwork */}
-      <div className="relative overflow-hidden">
+      <div className="relative overflow-hidden lg:bg-card/50">
         <div
-          className="pointer-events-none absolute inset-x-0 top-0 h-[62vh] lg:h-[42vh]"
+          className="pointer-events-none absolute inset-x-0 top-0 h-[62vh] lg:h-72"
           style={{ backgroundImage: `url(${cover})`, backgroundSize: "cover", backgroundPosition: "center", filter: "blur(60px) saturate(150%) brightness(0.5)" }}
           aria-hidden="true"
         />
-        <div className="pointer-events-none absolute inset-x-0 top-0 h-[62vh] bg-gradient-to-b from-background/20 via-background/60 to-background lg:h-[42vh]" />
+        <div className="pointer-events-none absolute inset-x-0 top-0 h-[62vh] bg-gradient-to-b from-background/20 via-background/60 to-background lg:h-72 lg:from-background/30 lg:via-background/65 lg:to-card/80" />
 
-        <div className="relative px-5 pt-8 lg:px-8 lg:pt-6">
+        <div className="relative px-5 pt-8 lg:px-8 lg:pt-10">
           <button onClick={() => navigate(-1)} aria-label="Go back" className="flex h-9 w-9 items-center justify-center rounded-full bg-background/60 text-foreground outline-none backdrop-blur transition-colors hover:bg-background focus-visible:ring-2 focus-visible:ring-primary lg:hidden">
             <ArrowLeft className="h-5 w-5" />
           </button>
@@ -120,12 +121,12 @@ export function DetailPage({
               animate={{ opacity: 1, scale: 1 }}
               src={cover || "/placeholder.svg"}
               alt={`${title} cover`}
-              className="mx-auto mt-6 aspect-square w-[62vw] max-w-[280px] rounded-md object-cover shadow-[0_18px_50px_-12px_rgba(0,0,0,0.75)] lg:mx-0 lg:mt-0 lg:h-56 lg:w-56 lg:max-w-none"
+              className="mx-auto mt-6 aspect-square w-[62vw] max-w-[280px] rounded-md object-cover shadow-elevated lg:mx-0 lg:mt-0 lg:h-48 lg:w-48 lg:max-w-none xl:h-56 xl:w-56"
             />
 
-            <div className="mt-6 lg:mt-0 lg:pb-2">
+            <div className="mt-6 min-w-0 lg:mt-0 lg:pb-2">
               <p className="hidden text-xs font-bold uppercase tracking-wide text-foreground lg:block">{typeLabel}</p>
-              <h1 className="text-[26px] font-black leading-tight tracking-tight text-foreground lg:text-[56px] lg:leading-[1.05]">{title}</h1>
+              <h1 className="break-words text-[26px] font-black leading-tight text-foreground lg:text-[48px] lg:leading-[1.08] xl:text-[64px]">{title}</h1>
               {owner && (
                 <button
                   onClick={owner.onClick}
@@ -140,14 +141,15 @@ export function DetailPage({
           </div>
 
           {/* Action row */}
-          <div className="mt-5 flex items-center gap-5 lg:mt-6">
-            <button
+          <div className="mt-5 flex items-center gap-5 lg:mt-0 lg:h-24 lg:bg-background/20 lg:px-1">
+            <Button
+              size="icon"
               onClick={() => tracks.length && playCollection(tracks, 0)}
               aria-label={`Play ${title}`}
-              className="order-last flex h-14 w-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-glow outline-none transition-transform hover:scale-105 focus-visible:ring-2 focus-visible:ring-primary active:scale-95 lg:order-first"
+              className="order-last h-14 w-14 rounded-full shadow-glow transition-transform hover:scale-105 active:scale-95 lg:order-first"
             >
               <Play className="ml-0.5 h-7 w-7" fill="currentColor" />
-            </button>
+            </Button>
             <button onClick={() => playCollection([...tracks].sort(() => Math.random() - 0.5), 0)} aria-label="Shuffle play" className="text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-primary">
               <Shuffle className="h-6 w-6" />
             </button>
@@ -171,7 +173,7 @@ export function DetailPage({
       </div>
 
       {/* Desktop table header */}
-      <div className="mt-8 hidden border-b border-border/60 px-8 pb-2 text-[11px] font-bold uppercase tracking-wider text-muted-foreground lg:grid lg:grid-cols-[32px_minmax(0,3fr)_minmax(0,2fr)_80px] lg:gap-4">
+      <div className="mt-8 hidden border-b border-border/60 px-8 pb-2 text-[11px] font-bold uppercase text-muted-foreground lg:grid lg:grid-cols-[32px_minmax(0,3fr)_minmax(0,2fr)_80px] lg:gap-4">
         <span className="text-center">#</span>
         <span>Title</span>
         <span>Album</span>
@@ -188,7 +190,7 @@ export function DetailPage({
             <li key={`${track.id}-${i}`}>
               <button
                 onClick={() => playCollection(tracks, i)}
-                className="flex w-full items-center gap-3 rounded-md py-2.5 text-left outline-none transition-colors hover:bg-foreground/5 focus-visible:ring-2 focus-visible:ring-primary lg:grid lg:grid-cols-[32px_minmax(0,3fr)_minmax(0,2fr)_80px] lg:items-center lg:gap-4 lg:px-2"
+                className="flex w-full items-center gap-3 rounded-md py-2.5 text-left outline-none transition-colors hover:bg-foreground/5 focus-visible:ring-2 focus-visible:ring-primary lg:grid lg:grid-cols-[32px_minmax(0,3fr)_minmax(0,2fr)_80px] lg:items-center lg:gap-4 lg:px-2 lg:py-1.5"
               >
                 <span className={cn("w-5 shrink-0 text-center text-[13px] font-semibold tabular-nums lg:w-auto", active ? "text-primary" : "text-muted-foreground")}>
                   {active && isPlaying ? "▶" : i + 1}
@@ -199,7 +201,7 @@ export function DetailPage({
                     src={track.artwork || cover || "/placeholder.svg"}
                     alt=""
                     loading="lazy"
-                    className="h-11 w-11 shrink-0 rounded-md object-cover ring-1 ring-border/40"
+                    className="h-11 w-11 shrink-0 rounded object-cover"
                   />
                   <span className="min-w-0 flex-1">
                     <span className={cn("block truncate text-[15px] font-semibold", active ? "text-primary" : "text-foreground")}>{track.title}</span>

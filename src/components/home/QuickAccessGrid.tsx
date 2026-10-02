@@ -4,6 +4,7 @@ import { usePlayer } from "@/context/PlayerContext";
 import { useListeningHistory } from "@/hooks/useListeningHistory";
 import { getChart, transformTrack } from "@/services/deezer";
 import type { Track } from "@/data/mockData";
+import { Button } from "@/components/ui/button";
 
 const SLOTS = 8;
 
@@ -40,19 +41,20 @@ export function QuickAccessGrid() {
   if (recentSongs.length === 0) return null;
 
   return (
-    <section className="mb-7 grid grid-cols-2 gap-2">
+    <section className="mb-7 grid grid-cols-2 gap-2 lg:grid-cols-3 xl:grid-cols-4 lg:gap-3">
       {recentSongs.map((t) => (
-        <button
+        <Button
+          variant="ghost"
           key={t.id}
           onClick={() => playTrack(t, recentSongs)}
-          className="group flex h-[56px] items-center gap-2.5 overflow-hidden rounded-[4px] bg-[hsl(0_0%_100%_/_0.08)] pr-2 text-left transition-colors hover:bg-[hsl(0_0%_100%_/_0.14)] active:scale-[0.98]"
+          className="group flex h-[56px] min-w-0 justify-start gap-2.5 overflow-hidden rounded-[4px] bg-secondary/70 p-0 pr-2 text-left transition-colors hover:bg-muted lg:h-[64px] lg:gap-3"
         >
-          <img src={t.artwork || "/placeholder.svg"} alt="" loading="lazy" className="h-full w-[56px] shrink-0 object-cover" />
-          <span className="line-clamp-2 min-w-0 flex-1 text-[13px] font-bold leading-tight text-foreground">{t.title}</span>
+          <img src={t.artwork || "/placeholder.svg"} alt="" loading="lazy" className="h-full w-[56px] shrink-0 object-cover lg:w-[64px]" />
+          <span className="line-clamp-2 min-w-0 flex-1 whitespace-normal text-[13px] font-bold leading-tight text-foreground lg:text-sm">{t.title}</span>
           <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground opacity-0 shadow-lg transition-opacity group-hover:opacity-100">
             <Play className="ml-0.5 h-3.5 w-3.5" fill="currentColor" />
           </span>
-        </button>
+        </Button>
       ))}
     </section>
   );
