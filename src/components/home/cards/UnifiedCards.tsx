@@ -7,17 +7,17 @@ import type { Track } from "@/data/mockData";
  * Responsive card width — roughly 2 cards on phones, 3 on tablets and
  * 4 on desktop, with a small peek so the row reads as scrollable.
  */
-const CARD_W = "w-[33vw] sm:w-[24vw] md:w-[19vw] lg:w-[15vw] max-w-[180px]";
+const CARD_W = "w-[33vw] sm:w-[24vw] md:w-[19vw] lg:w-[168px] xl:w-[182px] max-w-[182px]";
 /** Premium Spotify-grade artwork frame: soft graphite base, deep drop shadow. */
 const ART =
-  "overflow-hidden rounded-[8px] bg-[hsl(0_0%_14%)] shadow-[0_10px_28px_-8px_hsl(0_0%_0%_/_0.75)] ring-1 ring-white/[0.06] transition-all duration-300 group-hover:shadow-[0_18px_40px_-10px_hsl(0_0%_0%_/_0.9)] group-hover:ring-white/[0.12]";
+  "overflow-hidden rounded-[4px] bg-secondary shadow-card transition-all duration-300 group-hover:shadow-elevated";
 const IMG = "h-full w-full object-cover transition-transform duration-[600ms] ease-out group-hover:scale-[1.06]";
 /** Circular green play affordance shared by every card. */
 const PLAY_FAB =
-  "absolute bottom-2 right-2 flex h-11 w-11 translate-y-2 items-center justify-center rounded-full bg-primary text-primary-foreground opacity-0 shadow-[0_8px_18px_-4px_hsl(0_0%_0%_/_0.8)] transition-all duration-300 group-hover:translate-y-0 group-hover:opacity-100";
-const CARD_BTN = "group shrink-0 snap-start text-left transition-transform duration-300 active:scale-[0.97]";
+  "absolute bottom-2 right-2 flex h-11 w-11 translate-y-2 items-center justify-center rounded-full bg-primary text-primary-foreground opacity-0 shadow-card transition-all duration-300 group-hover:translate-y-0 group-hover:opacity-100 group-focus-visible:opacity-100";
+const CARD_BTN = "group shrink-0 snap-start text-left transition-colors duration-200 active:scale-[0.97] lg:rounded-md lg:bg-card/60 lg:p-3 lg:hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary";
 /** Spotify card typography: 14px semibold title, 12px normal muted subtitle. */
-const TITLE = "mt-2 line-clamp-1 text-[14px] font-semibold leading-[18px] tracking-[-0.01em] text-foreground";
+const TITLE = "mt-2 line-clamp-1 text-[14px] font-semibold leading-[18px] text-foreground";
 const SUB = "mt-0.5 line-clamp-1 h-[16px] text-[12px] font-normal leading-[16px] text-muted-foreground";
 
 
@@ -303,7 +303,7 @@ export function ArtistCard({ artist, onClick }: {
 }) {
   return (
     <button onClick={onClick} className={cn(CARD_BTN, "text-center", CARD_W)}>
-      <div className="relative mx-auto aspect-square w-full overflow-hidden rounded-full bg-[hsl(0_0%_14%)] shadow-[0_10px_28px_-8px_hsl(0_0%_0%_/_0.75)] ring-1 ring-white/[0.06] transition-all duration-300 group-hover:ring-primary/50">
+      <div className="relative mx-auto aspect-square w-full overflow-hidden rounded-full bg-secondary shadow-card transition-all duration-300 group-hover:ring-2 group-hover:ring-primary/50">
         {artist.picture
           ? <img src={artist.picture} alt={artist.name} loading="lazy" decoding="async" className={IMG} />
           : <div className="h-full w-full bg-secondary" />}
