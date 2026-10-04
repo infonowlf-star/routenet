@@ -591,9 +591,11 @@ export function GlobalAudioPlayer() {
   useEffect(() => {
     const track = currentTrack;
     const requestToken = ++searchTokenRef.current;
+    const switched = activeTrackIdRef.current !== (track?.id ?? null);
     activeTrackIdRef.current = track?.id ?? null;
-    // Stop the previous song right away so skips feel instant.
-    if (track) {
+    // Stop the previous song right away so skips feel instant
+    // (unless an automatic crossfade is handing over).
+    if (track && switched && !pendingFadeInRef.current) {
       stopPrevAudio();
       if (audioRef.current) {
         try { audioRef.current.pause(); } catch {}
