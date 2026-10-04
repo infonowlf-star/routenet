@@ -335,6 +335,9 @@ export function GlobalAudioPlayer() {
     }, CROSSFADE_FADE_INTERVAL_MS);
   }, [stopPrevAudio]);
 
+  // The track the user most recently selected — stale loads bail out.
+  const activeTrackIdRef = useRef<string | null>(null);
+
   // Offline-first: a downloaded blob, otherwise Piped audio
   const tryPlayWithPiped = useCallback(async (videoId: string | null, track: Track) => {
     let result: { url: string } | null = null;
@@ -365,6 +368,7 @@ export function GlobalAudioPlayer() {
     try {
       if (!result) result = await getPipedAudioUrl(videoId, 6000);
       if (!result) return false;
+      if (activeTrackIdRef.current !== track.id) return true; // user moved on
 
 
       if (isNativeAudioPluginAvailable()) {
@@ -411,6 +415,7 @@ export function GlobalAudioPlayer() {
       (audio as any).playsInline = true;
       audio.setAttribute("playsinline", "");
       audio.setAttribute("webkit-playsinline", "");
+      if (activeTrackIdRef.current !== track.id) return true;
       audio.autoplay = true;
       audioRef.current = audio;
 
@@ -586,6 +591,17 @@ export function GlobalAudioPlayer() {
   useEffect(() => {
     const track = currentTrack;
     const requestToken = ++searchTokenRef.current;
+    const switched = activeTrackIdRef.current !== (track?.id ?? null);
+    activeTrackIdRef.current = track?.id ?? null;
+    // Stop the previous song right away so skips feel instant
+    // (unless an automatic crossfade is handing over).
+    if (track && switched && !pendingFadeInRef.current) {
+      stopPrevAudio();
+      if (audioRef.current) {
+        try { audioRef.current.pause(); } catch {}
+      }
+      stopNativeAudioPlayback().catch(() => {});
+    }
 
     if (searchTimeoutRef.current) {
       clearTimeout(searchTimeoutRef.current);

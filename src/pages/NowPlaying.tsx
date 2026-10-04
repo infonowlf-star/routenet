@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowDownCircle, ChevronDown, Heart, Loader2, ListMusic, MessageSquareQuote, MoreHorizontal, Pause, Play, Plus, Repeat, Repeat1, Share2, Shuffle, SkipBack, SkipForward, Volume2 } from "lucide-react";
+import { ArrowDownCircle, ChevronDown, Heart, Loader2, ListMusic, MessageSquareQuote, Mic2, MoreHorizontal, Pause, Play, Plus, Repeat, Repeat1, Share2, Shuffle, SkipBack, SkipForward, Volume2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { AddToPlaylistDialog } from "@/components/AddToPlaylistDialog";
@@ -264,7 +264,7 @@ export default function NowPlaying() {
       <section className="relative z-10 shrink-0 px-10 pb-[calc(0.9rem+env(safe-area-inset-bottom))] pt-5 lg:pb-[6rem]">
         <div className="flex items-center justify-between">
           <button onClick={() => navigate("/lyrics")} aria-label="Lyrics" className="text-foreground/70 transition-colors hover:text-foreground">
-            <MessageSquareQuote className="h-[22px] w-[22px]" />
+            <Mic2 className="h-[22px] w-[22px]" />
           </button>
           <button onClick={toggleShuffle} aria-pressed={shuffle} aria-label="Shuffle" className={cn("text-foreground/70 transition-colors hover:text-foreground", shuffle && "text-primary")}>
             <Shuffle className="h-[21px] w-[21px]" />

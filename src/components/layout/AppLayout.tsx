@@ -12,7 +12,8 @@ import { DesktopLyricsPanel } from "@/components/nowplaying/DesktopLyricsPanel";
 import { usePlayer } from "@/context/PlayerContext";
 import { useDJBridge } from "@/hooks/useDJBridge";
 import { useMediaSession } from "@/hooks/useMediaSession";
-import { useDesktopLyricsOpen } from "@/hooks/useDesktopLyrics";
+import { useEffect } from "react";
+import { setDesktopLyricsOpen, useDesktopLyricsOpen } from "@/hooks/useDesktopLyrics";
 
 interface AppLayoutProps {
   children: ReactNode;
@@ -25,6 +26,9 @@ export function AppLayout({ children }: AppLayoutProps) {
   
   useDJBridge();
   useMediaSession();
+
+  // Navigating anywhere closes the inline desktop lyrics view.
+  useEffect(() => { setDesktopLyricsOpen(false); }, [location.pathname, location.search]);
 
   const hideChrome = location.pathname === "/lyrics";
   const hideMiniplayer = hideChrome || location.pathname === "/now-playing" || location.pathname === "/ai-dj" || location.pathname === "/radio";

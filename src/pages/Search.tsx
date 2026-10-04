@@ -265,7 +265,18 @@ export default function Search() {
     .filter((t) => !isBlockedArtist(t.artist, blocked))
     .slice()
     .sort((a, b) => rankedScore(debouncedQuery, b, taste) - rankedScore(debouncedQuery, a, taste));
-  const filteredTracks: Track[] = liveTracks.length ? liveTracks : (cached?.tracks || []);
+  const baseTracks: Track[] = liveTracks.length ? liveTracks : (cached?.tracks || []);
+  // Blend YouTube results into the song list so they appear with top songs.
+  const ytTracks: Track[] = (youtubeResults || []).map((v: any) => ({
+    id: `yt-${v.id}`, title: v.title, artist: v.channelTitle || "YouTube",
+    album: "", cover: v.thumbnail || "/placeholder.svg", artwork: v.thumbnail, duration: v.duration || 0, youtubeId: v.id,
+  } as unknown as Track));
+  const seenYt = new Set(baseTracks.map((t: any) => t.youtubeId).filter(Boolean));
+  const filteredTracks: Track[] = [
+    ...baseTracks.slice(0, 4),
+    ...ytTracks.filter((t: any) => !seenYt.has(t.youtubeId)).slice(0, 6),
+    ...baseTracks.slice(4),
+  ];
 
 
   const liveArtists: Artist[] = hasApiResults
