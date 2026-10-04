@@ -323,21 +323,16 @@ export default function Onboarding() {
       );
       const knownArtists = await resolveKnownArtists(seedNames, 28);
 
-      // 2. Sub-genres (more specific)
-      const subgenreLists = await Promise.all(
-        selectedSubgenres.slice(0, 4).map((sg) => fetchArtistsForStyle(sg, 8)),
-      );
-
-      // 3. Genres from Deezer playlist tracks.
-      const genreLists = await Promise.all(
-        selectedGenres.slice(0, 4).map((g) => fetchArtistsForStyle(g.name, 10)),
-      );
+      // Only mainstream artists for the chosen genres plus artists related to
+      // them — no random playlist-sourced (e.g. regional) artists.
+      const subgenreLists: ArtistPick[][] = [];
+      const genreLists: ArtistPick[][] = [];
 
       // 4. Similar artists from the recognizable seeds, plus a direct recommendation when the user has already picked an artist.
       const relatedLists = await Promise.all(
         selectedArtists.length > 0
           ? selectedArtists.slice(0, 4).map((a) => fetchRelatedArtists(a.id, 6))
-          : knownArtists.slice(0, 4).map((a) => fetchRelatedArtists(a.id, 6)),
+          : knownArtists.slice(0, 6).map((a) => fetchRelatedArtists(a.id, 5)),
       );
 
       const buckets = [knownArtists, ...subgenreLists, ...genreLists, ...relatedLists].filter((l) => l.length > 0);
