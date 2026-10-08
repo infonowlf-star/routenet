@@ -400,7 +400,6 @@ export default function Search() {
 
   // One flat result list — no per-type sections, just filtered by the pills.
   // In the "All" tab only a few albums are shown so they never flood the list.
-  let albumsShown = 0;
   const visibleItems = topItems.filter((e) => {
     if (activeFilter === 'tracks') return e.type === 'track';
     if (activeFilter === 'artists') return e.type === 'artist';
