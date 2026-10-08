@@ -168,7 +168,7 @@ export default function NowPlaying() {
             animate={{ rotateY: 18, rotateX: 4, opacity: 1 }}
             transition={{ type: "spring", stiffness: 120, damping: 18 }}
             style={{ transformStyle: "preserve-3d" }}
-            className="aspect-square w-full max-w-[min(34vw,58vh)] overflow-hidden rounded-xl shadow-[30px_40px_80px_-20px_hsl(0_0%_0%/0.85)]"
+            className="relative aspect-square w-full max-w-[min(34vw,58vh)] overflow-hidden rounded-xl shadow-[30px_40px_80px_-20px_hsl(0_0%_0%/0.85)]"
           >
             <img src={display.artwork} alt={display.title} className="h-full w-full object-cover" />
             <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-foreground/10 via-transparent to-background/40" />
