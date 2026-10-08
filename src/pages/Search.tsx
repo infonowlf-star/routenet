@@ -255,6 +255,7 @@ export default function Search() {
   }, [debouncedQuery, searchResults]);
 
   const hasQuery = query.length > 0;
+  const normQ = (x: string) => (x || "").toLowerCase().replace(/[^a-z0-9]+/g, "");
   // Keep the query alive across navigation so "back" restores the same results.
   useEffect(() => { persistedSearch.query = query; }, [query]);
   const hasApiResults = searchResults && (searchResults.artists.length > 0 || searchResults.tracks.length > 0 || searchResults.albums.length > 0);
@@ -272,19 +273,25 @@ export default function Search() {
     album: "", cover: v.thumbnail || "/placeholder.svg", artwork: v.thumbnail, duration: v.duration || 0, youtubeId: v.id,
   } as unknown as Track));
   const seenYt = new Set(baseTracks.map((t: any) => t.youtubeId).filter(Boolean));
+  // YouTube songs are ranked together with catalog songs (not tacked on below).
   const filteredTracks: Track[] = [
-    ...baseTracks.slice(0, 4),
-    ...ytTracks.filter((t: any) => !seenYt.has(t.youtubeId)).slice(0, 6),
-    ...baseTracks.slice(4),
-  ];
-
+    ...baseTracks,
+    ...ytTracks.filter((t: any) => !seenYt.has(t.youtubeId)).slice(0, 8),
+  ].map((t, i) => ({ t, s: rankedScore(debouncedQuery, t, taste) - i * 0.01 }))
+    .sort((a, b) => b.s - a.s)
+    .map((x) => x.t);
 
   const liveArtists: Artist[] = hasApiResults
     ? searchResults.artists.map((a): Artist => ({ id: a.id, name: a.name, avatar: a.avatar || '', monthlyListeners: a.monthlyListeners || 0 }))
         .filter((a) => !isBlockedArtist(a.name, blocked))
         .sort((a, b) => rankedScore(debouncedQuery, { name: b.name, nb_fan: (b as any).monthlyListeners }, taste) - rankedScore(debouncedQuery, { name: a.name, nb_fan: (a as any).monthlyListeners }, taste))
     : [];
-  const filteredArtists: Artist[] = liveArtists.length ? liveArtists : (cached?.artists || []);
+  // YouTube channels become artist profiles too, so artists found only on YouTube still show.
+  const ytArtists: Artist[] = (youtubeResults || [])
+    .filter((v: any) => v.channelTitle && normQ(v.channelTitle).includes(normQ(debouncedQuery)))
+    .map((v: any) => ({ id: `ytc-${v.channelId || v.channelTitle}`, name: String(v.channelTitle).replace(/\s*-\s*Topic$|VEVO$/i, "").trim(), avatar: v.channelThumbnail || v.thumbnail || "", monthlyListeners: 0 }));
+  const baseArtists: Artist[] = liveArtists.length ? liveArtists : (cached?.artists || []);
+  const filteredArtists: Artist[] = [...baseArtists, ...ytArtists];
 
   // Fame map: artists that own the top song results, most popular first.
   const famousArtists = useMemo(() => {
@@ -393,18 +400,14 @@ export default function Search() {
 
   // One flat result list — no per-type sections, just filtered by the pills.
   // In the "All" tab only a few albums are shown so they never flood the list.
-  let albumsShown = 0;
   const visibleItems = topItems.filter((e) => {
     if (activeFilter === 'tracks') return e.type === 'track';
     if (activeFilter === 'artists') return e.type === 'artist';
-    if (activeFilter === 'albums') return e.type === 'album';
+    if (activeFilter === 'albums') return false;
     if (activeFilter === 'playlists') return e.type === 'playlist';
     if (activeFilter !== 'all') return false;
     if (e.type === 'artist') return true;
-    if (e.type === 'album') {
-      albumsShown += 1;
-      return albumsShown <= 3;
-    }
+    if (e.type === 'album') return false;
     return true;
   });
 
@@ -606,20 +609,23 @@ export default function Search() {
             <MixesResults query={debouncedQuery} />
           )}
 
-          {activeFilter === 'all' && (youtubeResults?.length ?? 0) > 0 && (
+          {showAlbums && dedupedAlbums.length > 0 && (
             <section>
-              <h2 className="mb-3 text-lg font-bold text-foreground">From YouTube</h2>
-              <div className="space-y-1">
-                {youtubeResults!.map((v) => (
-                  <button key={v.id} onClick={() => playTrack({
-                    id: `yt-${v.id}`, title: v.title, artist: v.channelTitle || "YouTube",
-                    album: "", cover: v.thumbnail || "/placeholder.svg", duration: 0, youtubeId: v.id,
-                  } as unknown as Track)} className="flex w-full items-center gap-3 rounded-xl p-2 text-left hover:bg-muted/40">
-                    <img src={v.thumbnail} alt="" loading="lazy" className="h-12 w-20 shrink-0 rounded-md object-cover" />
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-semibold text-foreground">{v.title}</p>
-                      <p className="truncate text-xs text-muted-foreground">{v.channelTitle}</p>
+              <h2 className="mb-3 text-lg font-bold text-foreground">Albums</h2>
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+                {dedupedAlbums.slice(0, activeFilter === 'albums' ? 40 : 8).map((al) => (
+                  <button key={al.id} onClick={() => {
+                    addRecentSearchItem({ id: String(al.id), kind: "album", title: al.title, subtitle: `Album • ${al.artist}`, artwork: al.artwork, query: al.title });
+                    navigate(`/album/${al.id.toString().replace("deezer-", "")}`);
+                  }} className="group rounded-md bg-card/60 p-3 text-left transition-colors hover:bg-card">
+                    <div className="relative aspect-square w-full overflow-hidden rounded-md shadow-lg">
+                      <img src={al.artwork} alt="" loading="lazy" className="h-full w-full object-cover" />
+                      <span className="absolute bottom-2 right-2 flex h-10 w-10 translate-y-2 items-center justify-center rounded-full bg-primary text-primary-foreground opacity-0 shadow-xl transition-all group-hover:translate-y-0 group-hover:opacity-100">
+                        <Play className="ml-0.5 h-4 w-4" fill="currentColor" />
+                      </span>
                     </div>
+                    <p className="mt-2 truncate text-sm font-semibold text-foreground">{al.title}</p>
+                    <p className="truncate text-xs text-muted-foreground">{al.artist}</p>
                   </button>
                 ))}
               </div>

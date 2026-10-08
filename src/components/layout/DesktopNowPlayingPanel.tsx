@@ -1,4 +1,7 @@
-import { ListMusic, Maximize2, X } from "lucide-react";
+import { useState } from "react";
+import { EyeOff, Eye, ListMusic, Maximize2, X } from "lucide-react";
+import { VideoCanvas } from "@/components/nowplaying/VideoCanvas";
+import { getCachedYouTubeId } from "@/components/player/GlobalAudioPlayer";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { usePlayer } from "@/context/PlayerContext";
@@ -7,6 +10,8 @@ export function DesktopNowPlayingPanel() {
   const navigate = useNavigate();
   const { currentTrack, queue, removeFromQueue } = usePlayer();
 
+  const [hidden, setHidden] = useState(() => localStorage.getItem("routenet_queue_hidden") === "1");
+  const toggleHidden = () => setHidden((h) => { localStorage.setItem("routenet_queue_hidden", h ? "0" : "1"); return !h; });
   const currentIndex = currentTrack ? queue.findIndex((t) => t.id === currentTrack.id) : -1;
   const upNext = currentIndex >= 0 ? queue.slice(currentIndex + 1, currentIndex + 11) : queue.slice(0, 10);
 
@@ -14,12 +19,29 @@ export function DesktopNowPlayingPanel() {
     <aside className="custom-scrollbar hidden h-full min-h-0 w-[280px] shrink-0 overflow-y-auto rounded-md border-0 bg-background-elevated p-4 outline-none xl:block 2xl:w-[300px]">
       <div className="mb-3 flex items-center justify-between">
         <h2 className="text-sm font-bold text-foreground">Now playing</h2>
+        <div className="flex items-center gap-1">
+        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={toggleHidden} aria-pressed={hidden} aria-label={hidden ? "Show queue" : "Hide queue"}>
+          {hidden ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
+        </Button>
         <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => navigate("/now-playing")} aria-label="Open player">
           <Maximize2 className="h-4 w-4" />
         </Button>
+        </div>
       </div>
 
-      {currentTrack ? (
+      {currentTrack && hidden ? (
+        <div className="relative h-[calc(100%-2.5rem)] min-h-80 overflow-hidden rounded-lg">
+          <VideoCanvas
+            trackId={currentTrack.id}
+            artwork={currentTrack.artwork || ""}
+            videoId={currentTrack.youtubeId || getCachedYouTubeId(currentTrack.title, currentTrack.artist) || undefined}
+          />
+          <div className="absolute inset-x-0 bottom-0 p-4">
+            <p className="truncate text-lg font-bold text-foreground">{currentTrack.title}</p>
+            <p className="truncate text-sm text-muted-foreground">{currentTrack.artist}</p>
+          </div>
+        </div>
+      ) : currentTrack ? (
         <>
           <div className="flex items-center gap-3">
             <img

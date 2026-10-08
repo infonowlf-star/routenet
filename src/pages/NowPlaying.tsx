@@ -11,6 +11,8 @@ import { Slider } from "@/components/ui/slider";
 import { usePlayer } from "@/context/PlayerContext";
 import { cn } from "@/lib/utils";
 import { SyncedVideoPanel } from "@/components/nowplaying/SyncedVideoPanel";
+import { VideoCanvas } from "@/components/nowplaying/VideoCanvas";
+import { LyricsStream } from "@/components/nowplaying/LyricsStream";
 import { lookupMeta, peekMeta, type DeezerMeta } from "@/services/metadataEnrichment";
 
 import { toTitleCase } from "@/utils/toTitleCase";
@@ -152,9 +154,40 @@ export default function NowPlaying() {
           style={{ background: bgColor }}
         />
       </AnimatePresence>
+      <VideoCanvas trackId={currentTrack.id} artwork={display.artwork} videoId={videoId} />
+
+      {/* Desktop: bent artwork left, rolling lyrics right */}
+      <div className="relative z-10 hidden min-h-0 flex-1 grid-cols-[minmax(0,5fr)_minmax(0,6fr)] gap-12 px-14 pb-28 pt-10 lg:grid">
+        <div className="flex min-h-0 flex-col justify-center [perspective:1200px]">
+          <Button variant="ghost" size="icon" onClick={() => navigate(-1)} aria-label="Back" className="mb-6 rounded-full text-foreground/70 hover:bg-foreground/10">
+            <ChevronDown className="h-5 w-5" />
+          </Button>
+          <motion.div
+            key={currentTrack.id}
+            initial={{ rotateY: 0, opacity: 0 }}
+            animate={{ rotateY: 18, rotateX: 4, opacity: 1 }}
+            transition={{ type: "spring", stiffness: 120, damping: 18 }}
+            style={{ transformStyle: "preserve-3d" }}
+            className="relative aspect-square w-full max-w-[min(34vw,58vh)] overflow-hidden rounded-xl shadow-[30px_40px_80px_-20px_hsl(0_0%_0%/0.85)]"
+          >
+            <img src={display.artwork} alt={display.title} className="h-full w-full object-cover" />
+            <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-foreground/10 via-transparent to-background/40" />
+          </motion.div>
+          <h1 className="mt-8 truncate text-3xl font-bold text-foreground">{toTitleCase(display.title)}</h1>
+          <button onClick={() => navigate(`/artist/${encodeURIComponent(display.artist)}`)} className="truncate text-left text-lg text-foreground/60 hover:text-foreground">
+            {toTitleCase(display.artist)}
+          </button>
+        </div>
+        <LyricsStream
+          title={currentTrack.title}
+          artist={currentTrack.artist}
+          currentTime={currentTime}
+          onSeek={(t) => actualDuration > 0 && handleSeek(t / actualDuration)}
+        />
+      </div>
 
       {/* Grabber + collapse */}
-      <header className="relative z-10 flex shrink-0 items-center justify-between px-4 pt-[calc(0.5rem+env(safe-area-inset-top))]">
+      <header className="relative z-10 flex shrink-0 items-center justify-between px-4 pt-[calc(0.5rem+env(safe-area-inset-top))] lg:hidden">
         <Button variant="ghost" size="icon" onClick={() => navigate(-1)} aria-label="Back" className="rounded-full text-foreground/70 hover:bg-foreground/10">
           <ChevronDown className="h-5 w-5" />
         </Button>
@@ -162,7 +195,7 @@ export default function NowPlaying() {
         <span className="h-9 w-9" />
       </header>
 
-      <div className="relative z-10 flex min-h-0 flex-1 flex-col justify-center px-7">
+      <div className="relative z-10 flex min-h-0 flex-1 flex-col justify-center px-7 lg:hidden">
         {/* Square artwork */}
         <motion.div
           key={currentTrack.id}
@@ -261,7 +294,7 @@ export default function NowPlaying() {
       </div>
 
       {/* Bottom icon bar */}
-      <section className="relative z-10 shrink-0 px-10 pb-[calc(0.9rem+env(safe-area-inset-bottom))] pt-5 lg:pb-[6rem]">
+      <section className="relative z-10 shrink-0 px-10 pb-[calc(0.9rem+env(safe-area-inset-bottom))] pt-5 lg:hidden">
         <div className="flex items-center justify-between">
           <button onClick={() => navigate("/lyrics")} aria-label="Lyrics" className="text-foreground/70 transition-colors hover:text-foreground">
             <Mic2 className="h-[22px] w-[22px]" />
