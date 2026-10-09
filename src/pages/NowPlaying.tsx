@@ -162,17 +162,20 @@ export default function NowPlaying() {
           <Button variant="ghost" size="icon" onClick={() => navigate(-1)} aria-label="Back" className="mb-6 rounded-full text-foreground/70 hover:bg-foreground/10">
             <ChevronDown className="h-5 w-5" />
           </Button>
-          <motion.div
-            key={currentTrack.id}
-            initial={{ rotateY: 0, opacity: 0 }}
-            animate={{ rotateY: 18, rotateX: 4, opacity: 1 }}
-            transition={{ type: "spring", stiffness: 120, damping: 18 }}
-            style={{ transformStyle: "preserve-3d" }}
-            className="relative aspect-square w-full max-w-[min(34vw,58vh)] overflow-hidden rounded-xl shadow-[30px_40px_80px_-20px_hsl(0_0%_0%/0.85)]"
-          >
-            <img src={display.artwork} alt={display.title} className="h-full w-full object-cover" />
-            <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-foreground/10 via-transparent to-background/40" />
-          </motion.div>
+          <div className="relative flex w-full max-w-[min(34vw,58vh)] flex-col items-center">
+            <div className="pointer-events-none absolute -inset-16 rounded-full bg-primary/20 blur-[90px]" />
+            <motion.div
+              key={currentTrack.id}
+              initial={{ opacity: 0, y: 30, scale: 0.94 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              transition={{ type: "spring", stiffness: 110, damping: 18 }}
+              className="rn-suspend relative z-10 aspect-square w-full overflow-hidden rounded-xl shadow-[0_0_60px_-10px_hsl(var(--foreground)/0.35),0_60px_80px_-40px_hsl(0_0%_0%/0.9)]"
+            >
+              <img src={display.artwork} alt={display.title} className="h-full w-full object-cover" />
+            </motion.div>
+            {/* light beam holding the cover in the air */}
+            <div className="pointer-events-none mt-2 h-24 w-1/2 bg-gradient-to-b from-foreground/25 to-transparent blur-md [clip-path:polygon(20%_0,80%_0,55%_100%,45%_100%)]" />
+          </div>
           <h1 className="mt-8 truncate text-3xl font-bold text-foreground">{toTitleCase(display.title)}</h1>
           <button onClick={() => navigate(`/artist/${encodeURIComponent(display.artist)}`)} className="truncate text-left text-lg text-foreground/60 hover:text-foreground">
             {toTitleCase(display.artist)}

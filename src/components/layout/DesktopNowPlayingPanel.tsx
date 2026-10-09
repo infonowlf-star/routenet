@@ -1,3 +1,4 @@
+import { rightPanelPref } from "@/hooks/useUiPrefs";
 import { useState } from "react";
 import { EyeOff, Eye, ListMusic, Maximize2, X } from "lucide-react";
 import { VideoCanvas } from "@/components/nowplaying/VideoCanvas";
@@ -10,11 +11,13 @@ export function DesktopNowPlayingPanel() {
   const navigate = useNavigate();
   const { currentTrack, queue, removeFromQueue } = usePlayer();
 
+  const panelOpen = rightPanelPref.use();
   const [hidden, setHidden] = useState(() => localStorage.getItem("routenet_queue_hidden") === "1");
   const toggleHidden = () => setHidden((h) => { localStorage.setItem("routenet_queue_hidden", h ? "0" : "1"); return !h; });
   const currentIndex = currentTrack ? queue.findIndex((t) => t.id === currentTrack.id) : -1;
   const upNext = currentIndex >= 0 ? queue.slice(currentIndex + 1, currentIndex + 11) : queue.slice(0, 10);
 
+  if (panelOpen !== "open") return null;
   return (
     <aside className="custom-scrollbar hidden h-full min-h-0 w-[280px] shrink-0 overflow-y-auto rounded-md border-0 bg-background-elevated p-4 outline-none xl:block 2xl:w-[300px]">
       <div className="mb-3 flex items-center justify-between">

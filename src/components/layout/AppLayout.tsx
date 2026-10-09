@@ -1,4 +1,6 @@
 import { ReactNode } from "react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
+import { rightPanelPref } from "@/hooks/useUiPrefs";
 import { useLocation } from "react-router-dom";
 import { BottomNav } from "./BottomNav";
 import { MiniPlayer } from "./MiniPlayer";
@@ -23,6 +25,7 @@ export function AppLayout({ children }: AppLayoutProps) {
   const { currentTrack } = usePlayer();
   const location = useLocation();
   const lyricsOpen = useDesktopLyricsOpen();
+  const panelOpen = rightPanelPref.use() === "open";
   
   useDJBridge();
   useMediaSession();
@@ -51,6 +54,15 @@ export function AppLayout({ children }: AppLayoutProps) {
             )}
           </main>
         </div>
+        {!hideChrome && (
+          <button
+            onClick={() => rightPanelPref.set(panelOpen ? "closed" : "open")}
+            aria-label={panelOpen ? "Hide side panel" : "Show side panel"}
+            className="hidden w-5 shrink-0 items-center justify-center self-center rounded-full bg-background-elevated py-6 text-muted-foreground transition-colors hover:text-foreground xl:flex"
+          >
+            {panelOpen ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
+          </button>
+        )}
         {!hideChrome && <DesktopNowPlayingPanel />}
       </div>
       
