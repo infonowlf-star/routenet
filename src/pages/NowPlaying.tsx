@@ -42,6 +42,7 @@ export default function NowPlaying() {
   const [downloadPercent, setDownloadPercent] = useState(0);
   const [showVideo, setShowVideo] = useState(false);
   const [showVolume, setShowVolume] = useState(false);
+  const [videoActive, setVideoActive] = useState(false);
   const [volume, setVolume] = useState(() => getGlobalVolume());
   /** Deezer metadata for the current song (title / artist / album / hi-res art). */
   const [meta, setMeta] = useState<DeezerMeta | null>(null);
@@ -154,7 +155,7 @@ export default function NowPlaying() {
           style={{ background: bgColor }}
         />
       </AnimatePresence>
-      <VideoCanvas trackId={currentTrack.id} artwork={display.artwork} videoId={videoId} />
+      <VideoCanvas trackId={currentTrack.id} artwork={display.artwork} videoId={videoId} artist={currentTrack.artist} title={currentTrack.title} onActiveChange={setVideoActive} />
 
       {/* Desktop: bent artwork left, rolling lyrics right */}
       <div className="relative z-10 hidden min-h-0 flex-1 grid-cols-[minmax(0,5fr)_minmax(0,6fr)] gap-12 px-14 pb-28 pt-10 lg:grid">
@@ -162,7 +163,7 @@ export default function NowPlaying() {
           <Button variant="ghost" size="icon" onClick={() => navigate(-1)} aria-label="Back" className="mb-6 rounded-full text-foreground/70 hover:bg-foreground/10">
             <ChevronDown className="h-5 w-5" />
           </Button>
-          <div className="relative flex w-full max-w-[min(34vw,58vh)] flex-col items-center">
+          <div className={`relative flex w-full max-w-[min(34vw,58vh)] flex-col items-center transition-opacity duration-700 ${videoActive ? "pointer-events-none opacity-0" : "opacity-100"}`}>
             <div className="pointer-events-none absolute -inset-16 rounded-full bg-primary/20 blur-[90px]" />
             <motion.div
               key={currentTrack.id}
@@ -205,7 +206,7 @@ export default function NowPlaying() {
           initial={{ scale: 0.96, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
           transition={{ type: "spring", stiffness: 240, damping: 26 }}
-          className="mx-auto aspect-square w-full max-w-[min(78vw,44dvh)] overflow-hidden rounded-[10px] shadow-[0_18px_50px_-12px_hsl(0_0%_0%/0.7)]"
+          className={`mx-auto aspect-square w-full max-w-[min(78vw,44dvh)] overflow-hidden rounded-[10px] shadow-[0_18px_50px_-12px_hsl(0_0%_0%/0.7)] transition-opacity duration-700 ${videoActive ? "invisible opacity-0" : ""}`}
         >
           {isResolving ? (
             <div className="flex h-full w-full items-center justify-center bg-secondary">

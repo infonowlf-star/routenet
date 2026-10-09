@@ -38,6 +38,8 @@ export function DesktopNowPlayingPanel() {
             trackId={currentTrack.id}
             artwork={currentTrack.artwork || ""}
             videoId={currentTrack.youtubeId || getCachedYouTubeId(currentTrack.title, currentTrack.artist) || undefined}
+            artist={currentTrack.artist}
+            title={currentTrack.title}
           />
           <div className="absolute inset-x-0 bottom-0 p-4">
             <p className="truncate text-lg font-bold text-foreground">{currentTrack.title}</p>

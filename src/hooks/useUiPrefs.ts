@@ -11,7 +11,7 @@ function makePref(key: string, def: string) {
   return { read, set, use };
 }
 
-export const rightPanelPref = makePref("routenet_right_panel", "closed");
+export const rightPanelPref = makePref("routenet_right_panel_v2", "open");
 export const cardStylePref = makePref("routenet_card_style", "spotify");
 
 export function applyCardStyle(v = cardStylePref.read()) {

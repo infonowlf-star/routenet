@@ -3,7 +3,8 @@ import { useNavigate } from "react-router-dom";
 import type { SectionDescriptor, SectionResult } from "@/services/homeFeedEngine";
 import type { Track } from "@/data/mockData";
 import { cached, peekCached } from "@/services/homeCache";
-import { SongCard, PlaylistCard, ArtistCard, CardSkeleton, SongListRow, SongListColumn, AlbumListRow, MusicVideoListItem, VideoListColumn, ListSkeleton, VideoSkeleton } from "./cards/UnifiedCards";
+import { cardStylePref } from "@/hooks/useUiPrefs";
+import { AlbumCard as UAlbumCard, SongCard, PlaylistCard, ArtistCard, CardSkeleton, SongListRow, SongListColumn, AlbumListRow, MusicVideoListItem, VideoListColumn, ListSkeleton, VideoSkeleton } from "./cards/UnifiedCards";
 
 interface Props {
   section: SectionDescriptor;
@@ -61,8 +62,18 @@ export function HomeSectionRow({ section, onPlay }: Props) {
   if (state === "empty") return null;
 
 
+  const cardStyle = cardStylePref.use();
+  const spotify = cardStyle === "spotify";
   const items = (() => {
     if (!data) return null;
+    if (spotify) {
+      if (section.kind === "videos" && data.videos?.length) {
+        const src = data.videos.slice(0, 20).map((x) => ({ id: `yt-${x.videoId}`, title: x.title, artist: x.artist, album: "", artwork: x.thumbnail, duration: x.duration || 0, youtubeId: x.videoId } as Track));
+        return src.map((t) => <SongCard key={t.id} track={t} onClick={() => onPlay(t, src)} />);
+      }
+      if (data.songs?.length) return data.songs.slice(0, 20).map((t) => <SongCard key={t.id} track={t} onClick={() => onPlay(t, data.songs!)} />);
+      if (data.albums?.length) return data.albums.slice(0, 20).map((a) => <UAlbumCard key={a.id} album={a} onClick={() => navigate(`/album/${String(a.id).replace("deezer-", "")}`)} />);
+    }
     if (section.kind === "videos" && data.videos?.length) {
       const vids = data.videos.slice(0, 12);
       const asTrack = (x: typeof vids[number]): Track => ({
