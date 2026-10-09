@@ -206,7 +206,7 @@ export default function NowPlaying() {
           initial={{ scale: 0.96, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
           transition={{ type: "spring", stiffness: 240, damping: 26 }}
-          className={`mx-auto aspect-square w-full max-w-[min(78vw,44dvh)] overflow-hidden transition-opacity duration-700 ${videoActive ? "invisible opacity-0" : ""}`} data-x=" rounded-[10px] shadow-[0_18px_50px_-12px_hsl(0_0%_0%/0.7)]"
+          className={`mx-auto aspect-square w-full max-w-[min(78vw,44dvh)] overflow-hidden rounded-[10px] shadow-[0_18px_50px_-12px_hsl(0_0%_0%/0.7)] transition-opacity duration-700 ${videoActive ? "invisible opacity-0" : ""}`}
         >
           {isResolving ? (
             <div className="flex h-full w-full items-center justify-center bg-secondary">
