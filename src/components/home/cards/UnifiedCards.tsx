@@ -15,7 +15,7 @@ const IMG = "h-full w-full object-cover transition-transform duration-[600ms] ea
 /** Circular green play affordance shared by every card. */
 const PLAY_FAB =
   "absolute bottom-2 right-2 flex h-11 w-11 translate-y-2 items-center justify-center rounded-full bg-primary text-primary-foreground opacity-0 shadow-card transition-all duration-300 group-hover:translate-y-0 group-hover:opacity-100 group-focus-visible:opacity-100";
-const CARD_BTN = "group shrink-0 snap-start text-left transition-colors duration-200 active:scale-[0.97] lg:rounded-md lg:bg-card/60 lg:p-3 lg:hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary";
+const CARD_BTN = "rn-card group shrink-0 snap-start text-left transition-colors duration-200 active:scale-[0.97] lg:rounded-md lg:bg-card/60 lg:p-3 lg:hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary";
 /** Spotify card typography: 14px semibold title, 12px normal muted subtitle. */
 const TITLE = "mt-2 line-clamp-1 text-[14px] font-semibold leading-[18px] text-foreground";
 const SUB = "mt-0.5 line-clamp-1 h-[16px] text-[12px] font-normal leading-[16px] text-muted-foreground";
