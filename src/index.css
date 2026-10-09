@@ -174,3 +174,6 @@ html[data-cards="classic"] .rn-card > div:first-child { border-radius: 1rem; box
 
 @keyframes rn-suspend { 0%,100% { transform: translateY(0) } 50% { transform: translateY(-14px) } }
 .rn-suspend { animation: rn-suspend 6s ease-in-out infinite; }
+
+/* Spotify card mode on every screen size */
+html[data-cards="spotify"] .rn-card { background: hsl(var(--card) / 0.6); padding: 0.5rem; border-radius: 0.5rem; }
