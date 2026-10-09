@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useState } from "react";
-import { ArrowDownCircle, Heart, ListMusic, Loader2, Mic2, Pause, Play, Plus, Repeat, Repeat1, Shuffle, SkipBack, SkipForward } from "lucide-react";
+import { Volume2, VolumeX, MonitorSpeaker, PanelRight, Maximize2, ArrowDownCircle, Heart, ListMusic, Loader2, Mic2, Pause, Play, Plus, Repeat, Repeat1, Shuffle, SkipBack, SkipForward } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { AddToPlaylistDialog } from "@/components/AddToPlaylistDialog";
-import { seekGlobalAudio } from "@/components/player/GlobalAudioPlayer";
+import { setGlobalVolume, getGlobalVolume, seekGlobalAudio } from "@/components/player/GlobalAudioPlayer";
 import { usePlayer } from "@/context/PlayerContext";
 import { cn } from "@/lib/utils";
+import { rightPanelPref } from "@/hooks/useUiPrefs";
 import { isDesktopViewport, toggleDesktopLyrics, useDesktopLyricsOpen } from "@/hooks/useDesktopLyrics";
 
 function formatTime(seconds: number) {
@@ -23,6 +24,9 @@ export function DesktopPlayerBar() {
 
   const [liked, setLiked] = useState(false);
   const lyricsOpen = useDesktopLyricsOpen();
+  const panelOpen = rightPanelPref.use() === "open";
+  const [volume, setVolume] = useState(() => getGlobalVolume());
+  const changeVol = (v: number) => { setVolume(v); setGlobalVolume(v); };
   const [showPlaylistDialog, setShowPlaylistDialog] = useState(false);
   const [downloadStatus, setDownloadStatus] = useState<"idle" | "downloading" | "done" | "failed">("idle");
 
@@ -68,10 +72,10 @@ export function DesktopPlayerBar() {
 
   return (
     <>
-      <footer className="hidden h-[78px] shrink-0 grid-cols-[minmax(200px,1fr)_minmax(320px,1.5fr)_minmax(170px,1fr)] items-center bg-sidebar px-4 lg:grid">
+      <footer className="hidden h-[88px] shrink-0 grid-cols-[minmax(200px,1fr)_minmax(320px,1.5fr)_minmax(170px,1fr)] items-center bg-sidebar px-4 lg:grid">
         <div className="flex min-w-0 items-center gap-3">
           <button onClick={() => navigate("/now-playing")} className="flex min-w-0 items-center gap-3 text-left">
-            <img src={currentTrack.artwork || "/placeholder.svg"} alt="" className="h-14 w-14 rounded-md object-cover" />
+            <img src={currentTrack.artwork || "/placeholder.svg"} alt="" className="h-[68px] w-[68px] rounded-md object-cover shadow-lg" />
             <span className="min-w-0">
               <span className="block truncate text-sm font-semibold">{currentTrack.title}</span>
               <span className="block truncate text-xs text-muted-foreground">{currentTrack.artist}</span>
@@ -134,6 +138,11 @@ export function DesktopPlayerBar() {
             {downloadStatus === "downloading" ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowDownCircle className="h-4 w-4" />}
           </Button>
           <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => navigate("/queue")} aria-label="Open queue"><ListMusic className="h-4 w-4" /></Button>
+          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => toast("Playing on this device")} aria-label="Connect to a device"><MonitorSpeaker className="h-4 w-4" /></Button>
+          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => changeVol(volume > 0 ? 0 : 0.8)} aria-label="Mute">{volume > 0 ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}</Button>
+          <input aria-label="Volume" type="range" min="0" max="100" value={Math.round(volume * 100)} onChange={(e) => changeVol(Number(e.target.value) / 100)} className="h-1 w-24 accent-primary" />
+          <Button variant="ghost" size="icon" className={cn("hidden h-8 w-8 xl:inline-flex", panelOpen && "text-primary")} onClick={() => rightPanelPref.set(panelOpen ? "closed" : "open")} aria-label="Now playing view"><PanelRight className="h-4 w-4" /></Button>
+          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => navigate("/now-playing")} aria-label="Full screen"><Maximize2 className="h-4 w-4" /></Button>
         </div>
       </footer>
 

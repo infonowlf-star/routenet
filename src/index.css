@@ -167,3 +167,10 @@
   @keyframes waveform { 0%, 100% { height: 20%; } 50% { height: 80%; } }
 }
 
+
+/* Classic Routenet card mode (toggle vs Spotify cards) */
+html[data-cards="classic"] .rn-card { background: transparent !important; padding: 0 !important; }
+html[data-cards="classic"] .rn-card > div:first-child { border-radius: 1rem; box-shadow: 0 12px 30px -12px hsl(var(--primary) / 0.45); }
+
+@keyframes rn-suspend { 0%,100% { transform: translateY(0) } 50% { transform: translateY(-14px) } }
+.rn-suspend { animation: rn-suspend 6s ease-in-out infinite; }

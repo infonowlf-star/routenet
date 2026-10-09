@@ -8,6 +8,8 @@ const savedTheme = localStorage.getItem("tunestream-theme") || "dark";
 document.documentElement.classList.add(savedTheme);
 
 const root = document.getElementById("root");
+import { applyCardStyle } from "./hooks/useUiPrefs";
+applyCardStyle();
 if (root) createRoot(root).render(<App />);
 registerAppPwa();
 

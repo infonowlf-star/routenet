@@ -1,3 +1,4 @@
+import { cardStylePref, applyCardStyle } from "@/hooks/useUiPrefs";
 import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { WifiOff } from "lucide-react";
@@ -158,7 +159,10 @@ export default function Home() {
     <div ref={scrollRef} className="custom-scrollbar relative min-h-screen overflow-y-auto pb-28 lg:min-h-0 lg:pb-8">
       <header className="sticky top-0 z-30 bg-background/80 backdrop-blur-xl lg:bg-background-elevated/90">
         <div className="px-4 pb-3 pt-9 lg:px-7 lg:pb-4 lg:pt-3">
-          <HomeFilterPills value={filter} onChange={setFilter} />
+          <div className="flex items-center justify-between gap-3">
+            <HomeFilterPills value={filter} onChange={setFilter} />
+            <CardStyleToggle />
+          </div>
         </div>
       </header>
 
@@ -180,3 +184,17 @@ export default function Home() {
   );
 }
 
+
+function CardStyleToggle() {
+  const style = cardStylePref.use();
+  const next = style === "spotify" ? "classic" : "spotify";
+  return (
+    <button
+      onClick={() => { cardStylePref.set(next); applyCardStyle(next); }}
+      className="shrink-0 rounded-full bg-muted px-3 py-1.5 text-xs font-semibold text-foreground transition-colors hover:bg-muted/70"
+      aria-label="Switch card style"
+    >
+      {style === "spotify" ? "Spotify cards" : "Classic cards"}
+    </button>
+  );
+}
